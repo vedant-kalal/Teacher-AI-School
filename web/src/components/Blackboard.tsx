@@ -18,7 +18,17 @@ export default function Blackboard({ content, lessonPlan, status, topic, diagram
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
+    return () => {
+      speechSynthesis.cancel();
+      setIsNarrating(false);
+    };
+  }, []);
+
+  useEffect(() => {
     if (status === 'completed' && content) {
+      speechSynthesis.cancel();
+      setIsNarrating(false);
+      
       const sections = content.sections || [];
       const fullText = sections
         .filter((s: any) => s.type === 'content')
@@ -84,11 +94,25 @@ export default function Blackboard({ content, lessonPlan, status, topic, diagram
     const diagram = diagrams?.[0];
     const image = images?.[0];
     
-    if (diagram?.image_base64) {
-      return { base64: diagram.image_base64, title: diagram.title || 'Diagram' };
+    if (diagram?.image_base64 || diagram?.imageBase64) {
+      return { 
+        base64: diagram.image_base64 || diagram.imageBase64, 
+        title: diagram.title || 'Diagram',
+        url: diagram.image_url || diagram.imageUrl
+      };
     }
-    if (image?.image_base64) {
-      return { base64: image.image_base64, title: 'Educational Image' };
+    if (image?.image_base64 || image?.imageBase64) {
+      return { 
+        base64: image.image_base64 || image.imageBase64, 
+        title: 'Educational Image',
+        url: image.image_url || image.imageUrl
+      };
+    }
+    if (diagram?.image_url || diagram?.imageUrl) {
+      return { url: diagram.image_url || diagram.imageUrl, title: diagram.title || 'Diagram' };
+    }
+    if (image?.image_url || image?.imageUrl) {
+      return { url: image.image_url || image.imageUrl, title: 'Educational Image' };
     }
     return null;
   };
@@ -159,7 +183,9 @@ export default function Blackboard({ content, lessonPlan, status, topic, diagram
           {showImages && generatedImage && (
             <div className="board-image-container">
               <img 
-                src={`data:image/png;base64,${generatedImage.base64}`}
+                src={generatedImage.base64 
+                  ? `data:image/png;base64,${generatedImage.base64}` 
+                  : generatedImage.url}
                 alt={generatedImage.title}
                 className="board-generated-image"
               />

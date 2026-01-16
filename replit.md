@@ -28,13 +28,14 @@ The application now uses a Python backend with LangGraph for lesson generation, 
    - `tools/lesson_tools.py` - 7 specialized teaching tools
 
 2. **Teaching Tools** (`python_backend/tools/lesson_tools.py`)
-   - `create_lesson_plan` - Creates structured lesson plans with learning objectives
-   - `generate_board_content` - Creates blackboard-style educational content
-   - `create_diagrams` - Generates concept maps and visual diagrams
-   - `generate_images` - Produces educational image descriptions
-   - `create_3d_simulation` - Creates interactive 3D simulation specs
-   - `create_video` - Produces educational video storyboards
-   - `review_quality` - Reviews content for educational quality (score 1-100)
+   - `content_planner` - Analyzes topics to decide which media types are needed (diagrams, images, 3D, video)
+   - `lesson_planner` - Creates structured lesson plans with learning objectives
+   - `board_writer` - Creates blackboard-style educational content with narration script for TTS
+   - `diagram_creator` - Generates **actual AI images** of concept maps using OpenAI gpt-image-1
+   - `image_generator` - Produces **actual AI-generated** educational images using OpenAI gpt-image-1
+   - `simulation_3d_creator` - Creates interactive 3D simulation specs (JSON for Three.js)
+   - `video_storyboard` - Produces educational video storyboards
+   - `quality_reviewer` - Reviews content for educational quality (score 1-100)
 
 3. **Mastra Gateway** (`src/mastra/index.ts`)
    - Proxies API requests to Python backend via pythonBridge.ts
@@ -43,20 +44,27 @@ The application now uses a Python backend with LangGraph for lesson generation, 
 
 4. **Frontend** (`web/src/`)
    - `App.tsx` - Main app with lesson state management and polling
-   - `components/Blackboard.tsx` - Chalkboard-style lesson display
+   - `components/Blackboard.tsx` - Chalkboard-style lesson display with:
+     - **Streaming text** - Words appear one at a time like a teacher writing
+     - **Text-to-speech** - "Listen to Teacher" button using browser Web Speech API
+     - **AI-generated images** - Actual diagrams/images displayed on blackboard
    - `components/TopicInput.tsx` - Topic input and quick suggestions
    - `components/LessonProgress.tsx` - Real-time step progress display
+   - `components/MediaGallery.tsx` - Displays AI-generated images, diagrams, 3D specs, and video storyboards
 
-### Workflow Steps (9 total)
+### Workflow Steps (10 total with smart skipping)
 1. Initialize - Set up session
-2. Creating Lesson Plan - Generate structured curriculum
-3. Writing Board Content - Create blackboard-style text
-4. Creating Diagrams - Generate concept maps
-5. Generating Images - Create visual assets
-6. Creating 3D Simulation - Design interactive simulations
-7. Creating Video - Produce video storyboard
-8. Quality Review - Educational content review (85+ score = approved)
-9. Compiling Lesson - Assemble final lesson package
+2. **Planning Content Types** - AI analyzes topic to decide which media are needed
+3. Creating Lesson Plan - Generate structured curriculum
+4. Writing Board Content - Create blackboard-style text + narration script
+5. Creating Diagrams - **Generate actual AI images** (skipped if not needed)
+6. Generating Images - **Generate actual AI images** (skipped if not needed)
+7. Creating 3D Simulation - Design interactive simulations (skipped if not needed)
+8. Creating Video - Produce video storyboard (skipped if not needed)
+9. Quality Review - Educational content review (85+ score = approved)
+10. Compiling Lesson - Assemble final lesson package
+
+**Smart Content Planning:** The content planner analyzes the topic and decides which media types (diagrams, images, 3D models, videos) are appropriate. For example, "World War II" may skip 3D models but include diagrams and images, while "The Solar System" includes 3D models.
 
 ### Startup Process
 1. `inngest.sh` script starts Python server (port 8001) in background
