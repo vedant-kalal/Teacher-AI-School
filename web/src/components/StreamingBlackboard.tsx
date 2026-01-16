@@ -11,7 +11,7 @@ interface StreamingBlackboardProps {
   onStopNarration?: () => void;
 }
 
-const MAX_VISIBLE_LINES = 8;
+const MAX_VISIBLE_LINES = 12;
 
 export default function StreamingBlackboard({
   boardState,
@@ -150,8 +150,8 @@ export default function StreamingBlackboard({
                   )}
                 </div>
 
-                <div className="image-column">
-                  {boardState.currentMedia && (boardState.currentMedia.image_base64 || boardState.currentMedia.image_url) && (
+                {boardState.currentMedia && (boardState.currentMedia.image_base64 || boardState.currentMedia.image_url) && (
+                  <div className="image-column">
                     <div className="media-box">
                       <img
                         src={
@@ -163,8 +163,8 @@ export default function StreamingBlackboard({
                       />
                       <div className="media-label handwriting">{boardState.currentMedia.title}</div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -174,26 +174,29 @@ export default function StreamingBlackboard({
       <style>{`
         .blackboard-wrapper {
           width: 100%;
-          max-width: 1200px;
-          margin: 0 auto;
+          height: 100%;
         }
 
         .blackboard-frame {
           background: linear-gradient(135deg, #5c4033 0%, #4a3228 50%, #5c4033 100%);
-          padding: 20px;
+          padding: 18px;
           border-radius: 12px;
           box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+          height: 100%;
+          width: 100%;
         }
 
         .blackboard {
           background: linear-gradient(145deg, #1a472a 0%, #0d2818 40%, #153d24 70%, #1a472a 100%);
           width: 100%;
-          height: 500px;
+          height: 100%;
           border-radius: 6px;
-          padding: 20px 30px 35px 30px;
+          padding: 20px 30px 30px 30px;
           position: relative;
           box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.4);
           overflow: hidden;
+          display: flex;
+          flex-direction: column;
         }
 
         .blackboard::before {
@@ -238,21 +241,21 @@ export default function StreamingBlackboard({
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          height: 100%;
+          flex: 1;
           color: #fff;
-          font-size: 1.6rem;
-          gap: 16px;
+          font-size: 2rem;
+          gap: 20px;
         }
-        .center-message p { margin: 8px 0; }
+        .center-message p { margin: 10px 0; }
         .center-message.error { color: #ff6b6b; }
 
         .loading-dots {
           display: flex;
-          gap: 8px;
+          gap: 10px;
         }
         .loading-dots span {
-          width: 12px;
-          height: 12px;
+          width: 14px;
+          height: 14px;
           background: rgba(255,255,255,0.8);
           border-radius: 50%;
           animation: bounce 1.4s infinite ease-in-out both;
@@ -265,10 +268,11 @@ export default function StreamingBlackboard({
         }
 
         .board-content {
-          height: 100%;
+          flex: 1;
           display: flex;
           flex-direction: column;
           color: #fff;
+          overflow: hidden;
         }
 
         .board-content.clearing {
@@ -281,13 +285,14 @@ export default function StreamingBlackboard({
 
         .speaking-badge {
           position: absolute;
-          top: 10px;
-          right: 15px;
+          top: 15px;
+          right: 20px;
           background: rgba(102, 126, 234, 0.4);
-          padding: 4px 12px;
-          border-radius: 12px;
-          font-size: 0.85rem;
+          padding: 6px 14px;
+          border-radius: 14px;
+          font-size: 0.9rem;
           animation: pulse 1.5s infinite;
+          z-index: 10;
         }
         @keyframes pulse {
           0%, 100% { opacity: 1; }
@@ -295,19 +300,18 @@ export default function StreamingBlackboard({
         }
 
         .board-title {
-          font-size: 1.8rem;
+          font-size: 2.2rem;
           text-align: center;
-          border-bottom: 2px solid rgba(255,255,255,0.3);
-          padding-bottom: 10px;
-          margin-bottom: 15px;
+          border-bottom: 3px solid rgba(255,255,255,0.3);
+          padding-bottom: 12px;
+          margin-bottom: 20px;
           flex-shrink: 0;
         }
 
         .board-body {
           flex: 1;
           display: flex;
-          gap: 20px;
-          min-height: 0;
+          gap: 30px;
           overflow: hidden;
         }
 
@@ -315,33 +319,33 @@ export default function StreamingBlackboard({
           flex: 1;
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 8px;
           overflow: hidden;
         }
 
         .board-line {
-          font-size: 1.15rem;
-          line-height: 1.4;
+          font-size: 1.4rem;
+          line-height: 1.5;
           white-space: pre-wrap;
           word-wrap: break-word;
         }
 
-        .board-title-text { font-size: 1.5rem; color: #ffd700 !important; }
-        .board-heading-text { font-size: 1.3rem; color: #87ceeb !important; margin-top: 6px; }
-        .board-normal-text { font-size: 1.15rem; }
+        .board-title-text { font-size: 1.8rem; color: #ffd700 !important; }
+        .board-heading-text { font-size: 1.6rem; color: #87ceeb !important; margin-top: 8px; }
+        .board-normal-text { font-size: 1.4rem; }
         .board-formula-text { 
           font-family: 'Times New Roman', serif;
           background: rgba(0,0,0,0.2);
-          padding: 6px 10px;
+          padding: 8px 12px;
           border-radius: 6px;
           display: inline-block;
         }
-        .board-bullet-text { padding-left: 12px; }
+        .board-bullet-text { padding-left: 16px; }
         .board-highlight-text {
           color: #ffd700 !important;
           background: rgba(255,215,0,0.1);
-          border-left: 3px solid #ffd700;
-          padding-left: 10px;
+          border-left: 4px solid #ffd700;
+          padding-left: 12px;
         }
 
         .cursor {
@@ -356,17 +360,17 @@ export default function StreamingBlackboard({
 
         .complete-badge {
           margin-top: auto;
-          padding: 12px;
+          padding: 14px;
           background: rgba(76, 175, 80, 0.2);
           border: 2px solid rgba(76, 175, 80, 0.4);
-          border-radius: 8px;
+          border-radius: 10px;
           text-align: center;
           color: #81c784;
-          font-size: 1.3rem;
+          font-size: 1.5rem;
         }
 
         .image-column {
-          width: 280px;
+          width: 350px;
           flex-shrink: 0;
           display: flex;
           align-items: flex-start;
@@ -375,10 +379,11 @@ export default function StreamingBlackboard({
 
         .media-box {
           background: rgba(255,255,255,0.08);
-          padding: 10px;
-          border-radius: 10px;
+          padding: 12px;
+          border-radius: 12px;
           border: 2px solid rgba(255,255,255,0.15);
           animation: fadeIn 0.5s ease-out;
+          max-width: 100%;
         }
         @keyframes fadeIn {
           from { opacity: 0; transform: scale(0.95); }
@@ -386,15 +391,15 @@ export default function StreamingBlackboard({
         }
 
         .media-box img {
-          max-width: 260px;
-          max-height: 280px;
-          border-radius: 6px;
+          max-width: 320px;
+          max-height: 350px;
+          border-radius: 8px;
           display: block;
         }
 
         .media-label {
-          margin-top: 8px;
-          font-size: 0.95rem;
+          margin-top: 10px;
+          font-size: 1.1rem;
           color: #ffd700;
           text-align: center;
         }
