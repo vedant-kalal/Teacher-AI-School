@@ -1,0 +1,45 @@
+AI Teacher Project - Setup and Run Instructions
+
+I have imported an AI Teacher project from GitHub. This is a multi-agent automation system for schools that delivers educational lessons through a web interface with a blackboard display.
+
+Project Overview:
+
+Uses Mastra framework for AI automation with 8 specialized teaching tools
+Single orchestrating AI agent (GPT-5) that calls tools for lesson planning, blackboard writing, diagrams, images, 3D simulations, video storyboards, and quality review
+Uses Inngest for scheduled workflow execution (cron trigger at 9 AM UTC daily)
+React/Vite frontend with a blackboard UI served at /ui
+PostgreSQL database for workflow state storage
+File-based lesson storage to avoid Inngest output size limits
+What I need you to do:
+
+Set up the database - Create a PostgreSQL database using Replit's built-in database
+
+Install dependencies - The project uses Node.js with packages including @mastra/core, @mastra/inngest, ai, react, etc.
+
+Configure AI Integrations - Set up OpenAI AI Integrations (Replit's built-in LLM access - no API key needed)
+
+Create two workflows:
+
+"Start application" - runs command: mastra dev
+"Start inngest server" - runs command: ./scripts/inngest.sh
+Build the frontend - Run cd web && npx vite build --outDir ../dist
+
+Test the workflow - Run npx tsx tests/testCronAutomation.ts to trigger a test lesson
+
+Key Files:
+
+src/mastra/index.ts - Main Mastra instance configuration
+src/mastra/agents/aiTeacherAgent.ts - The AI teaching agent
+src/mastra/workflows/aiTeacherWorkflow.ts - 9-step lesson delivery workflow
+src/mastra/tools/ - 8 teaching tools (lesson planner, board writing, diagrams, images, 3D simulation, video, quality monitor, prompt generator)
+web/src/ - React frontend with blackboard UI
+tests/testCronAutomation.ts - Manual workflow trigger for testing
+Expected Result:
+
+Mastra server running on port 5000
+Inngest server running on port 3000
+Web UI accessible at /ui showing a blackboard interface
+Users can enter topics and receive AI-generated lessons with visual content
+Please set this up and get the AI Teacher running with the complete UI.
+
+Copy this entire prompt and paste it to start in your new Replit account!
