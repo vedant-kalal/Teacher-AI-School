@@ -1,13 +1,98 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface BlackboardProps {
   content: any | null;
   lessonPlan: any | null;
   status: 'idle' | 'running' | 'completed' | 'error';
   topic: string;
+  diagrams?: any[];
+  images?: any[];
+  onNarrationComplete?: () => void;
 }
 
-export default function Blackboard({ content, lessonPlan, status, topic }: BlackboardProps) {
+export default function Blackboard({ content, lessonPlan, status, topic, diagrams, images, onNarrationComplete }: BlackboardProps) {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isNarrating, setIsNarrating] = useState(false);
+  const [showImages, setShowImages] = useState(false);
+  const textRef = useRef('');
+  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  useEffect(() => {
+    if (status === 'completed' && content) {
+      const sections = content.sections || [];
+      const fullText = sections
+        .filter((s: any) => s.type === 'content')
+        .map((s: any) => s.content)
+        .join('\n\n');
+      
+      textRef.current = fullText;
+      setDisplayedText('');
+      setShowImages(false);
+      
+      animateText(fullText);
+    }
+  }, [status, content]);
+
+  const animateText = (text: string) => {
+    let index = 0;
+    const words = text.split(' ');
+    
+    const interval = setInterval(() => {
+      if (index < words.length) {
+        setDisplayedText(words.slice(0, index + 1).join(' '));
+        index++;
+      } else {
+        clearInterval(interval);
+        setShowImages(true);
+      }
+    }, 60);
+
+    return () => clearInterval(interval);
+  };
+
+  const startNarration = () => {
+    if (!content?.narration || isNarrating) return;
+
+    setIsNarrating(true);
+    const utterance = new SpeechSynthesisUtterance(content.narration);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    
+    const voices = speechSynthesis.getVoices();
+    const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) 
+                      || voices.find(v => v.lang.startsWith('en'));
+    if (englishVoice) {
+      utterance.voice = englishVoice;
+    }
+
+    utterance.onend = () => {
+      setIsNarrating(false);
+      onNarrationComplete?.();
+    };
+
+    speechRef.current = utterance;
+    speechSynthesis.speak(utterance);
+  };
+
+  const stopNarration = () => {
+    speechSynthesis.cancel();
+    setIsNarrating(false);
+  };
+
+  const getGeneratedImage = () => {
+    const diagram = diagrams?.[0];
+    const image = images?.[0];
+    
+    if (diagram?.image_base64) {
+      return { base64: diagram.image_base64, title: diagram.title || 'Diagram' };
+    }
+    if (image?.image_base64) {
+      return { base64: image.image_base64, title: 'Educational Image' };
+    }
+    return null;
+  };
+
   const renderBoardContent = () => {
     if (status === 'idle') {
       return (
@@ -43,41 +128,43 @@ export default function Blackboard({ content, lessonPlan, status, topic }: Black
     }
 
     if (content) {
-      const title = content.title || content.boardContent?.title || topic;
-      const sections = content.sections || content.boardContent?.sections || [];
+      const title = content.title || topic;
+      const generatedImage = getGeneratedImage();
       
       return (
         <div className="board-content">
-          {title && <h2 className="board-title handwriting">{title}</h2>}
-          {sections.length > 0 ? sections.map((section: any, idx: number) => (
-            <div 
-              key={idx} 
-              className={`board-section section-${section.type} handwriting`}
-              style={{
-                fontSize: section.style?.size === 'large' ? '2rem' : 
-                         section.style?.size === 'small' ? '1.2rem' : '1.5rem',
-                textDecoration: section.style?.underline ? 'underline' : 'none',
-                fontWeight: section.style?.emphasis ? 'bold' : 'normal',
-              }}
-            >
-              {section.type === 'bullet_points' && typeof section.content === 'string' ? (
-                <ul>
-                  {section.content.split('\n').map((item: string, i: number) => (
-                    <li key={i}>{item.replace(/^[-*]\s*/, '')}</li>
-                  ))}
-                </ul>
-              ) : section.type === 'formula' ? (
-                <div className="formula">{section.content}</div>
-              ) : section.type === 'heading' || section.type === 'header' ? (
-                <h3 className="section-heading">{section.content}</h3>
+          <h2 className="board-title handwriting">{title}</h2>
+          
+          {content.narration && (
+            <div className="narration-controls">
+              {isNarrating ? (
+                <button onClick={stopNarration} className="speak-btn stop">
+                  🔊 Stop Narration
+                </button>
               ) : (
-                <p>{section.content}</p>
+                <button onClick={startNarration} className="speak-btn">
+                  🔊 Listen to Teacher
+                </button>
               )}
             </div>
-          )) : (
-            <p className="handwriting" style={{ fontSize: '1.3rem', lineHeight: '1.8' }}>
-              {content.chalk_color && '✏️ '}{typeof content === 'string' ? content : 'Lesson content loaded!'}
-            </p>
+          )}
+          
+          <div className="streaming-content handwriting">
+            {displayedText}
+            {displayedText.length < textRef.current.length && (
+              <span className="cursor">|</span>
+            )}
+          </div>
+
+          {showImages && generatedImage && (
+            <div className="board-image-container">
+              <img 
+                src={`data:image/png;base64,${generatedImage.base64}`}
+                alt={generatedImage.title}
+                className="board-generated-image"
+              />
+              <p className="image-caption handwriting">{generatedImage.title}</p>
+            </div>
           )}
         </div>
       );
@@ -240,6 +327,72 @@ export default function Blackboard({ content, lessonPlan, status, topic }: Black
           padding-bottom: 16px;
         }
 
+        .narration-controls {
+          text-align: center;
+          margin-bottom: 20px;
+        }
+
+        .speak-btn {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border: none;
+          color: white;
+          padding: 10px 24px;
+          border-radius: 24px;
+          font-size: 1rem;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .speak-btn:hover {
+          transform: scale(1.05);
+          box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .speak-btn.stop {
+          background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .streaming-content {
+          font-size: 1.3rem;
+          line-height: 1.8;
+          white-space: pre-wrap;
+        }
+
+        .cursor {
+          animation: blink 0.7s infinite;
+          font-weight: bold;
+        }
+
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+
+        .board-image-container {
+          margin-top: 30px;
+          text-align: center;
+          animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .board-generated-image {
+          max-width: 100%;
+          max-height: 400px;
+          border-radius: 12px;
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+          border: 3px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .image-caption {
+          margin-top: 12px;
+          font-size: 1.2rem;
+          color: #ffd700;
+        }
+
         .board-overview {
           font-size: 1.3rem;
           margin-bottom: 20px;
@@ -287,6 +440,23 @@ export default function Blackboard({ content, lessonPlan, status, topic }: Black
 
         .learning-objectives, .key-points {
           margin: 20px 0;
+        }
+
+        .learning-objectives ul, .key-points ul {
+          list-style: none;
+          padding-left: 20px;
+        }
+
+        .learning-objectives li, .key-points li {
+          position: relative;
+          margin: 8px 0;
+        }
+
+        .learning-objectives li::before, .key-points li::before {
+          content: '>';
+          position: absolute;
+          left: -20px;
+          color: #ffd700;
         }
 
         .error-message {

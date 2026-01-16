@@ -18,28 +18,33 @@ export default function MediaGallery({ diagrams, images, simulations, videos }: 
   ];
 
   const renderDiagram = (diagram: any, idx: number) => {
-    const data = diagram.diagramData || diagram;
+    const hasImage = diagram.image_base64 || diagram.imageBase64;
+    const imageBase64 = diagram.image_base64 || diagram.imageBase64;
+    
     return (
       <div key={idx} className="media-card">
-        <h4 className="card-title">{data.title || `Diagram ${idx + 1}`}</h4>
-        <p className="card-description">{data.description}</p>
+        <h4 className="card-title">{diagram.title || `Diagram ${idx + 1}`}</h4>
+        <p className="card-description">{diagram.description}</p>
         
-        {diagram.imageBase64 && (
-          <img 
-            src={`data:image/png;base64,${diagram.imageBase64}`} 
-            alt={data.title}
-            className="diagram-image"
-          />
+        {hasImage && (
+          <div className="generated-image-container">
+            <img 
+              src={`data:image/png;base64,${imageBase64}`} 
+              alt={diagram.title}
+              className="generated-image"
+            />
+            <span className="ai-badge">AI Generated</span>
+          </div>
         )}
         
-        {data.elements && (
+        {!hasImage && diagram.elements && (
           <div className="elements-list">
             <h5>Elements:</h5>
-            {typeof data.elements === 'string' ? (
-              <p className="elements-text">{data.elements}</p>
-            ) : Array.isArray(data.elements) && data.elements.length > 0 ? (
+            {typeof diagram.elements === 'string' ? (
+              <p className="elements-text">{diagram.elements}</p>
+            ) : Array.isArray(diagram.elements) && diagram.elements.length > 0 ? (
               <ul>
-                {data.elements.map((el: any, i: number) => (
+                {diagram.elements.map((el: any, i: number) => (
                   <li key={i}>
                     <strong>{el.label}</strong>: {el.description}
                   </li>
@@ -49,101 +54,80 @@ export default function MediaGallery({ diagrams, images, simulations, videos }: 
           </div>
         )}
 
-        {diagram.teacherNarration && (
-          <div className="narration">
-            <p>{diagram.teacherNarration}</p>
-          </div>
+        {diagram.generated && (
+          <div className="status-badge success">Image Generated</div>
         )}
       </div>
     );
   };
 
   const renderImage = (image: any, idx: number) => {
+    const hasImage = image.image_base64 || image.imageBase64;
+    const imageBase64 = image.image_base64 || image.imageBase64;
+    
     return (
       <div key={idx} className="media-card">
-        <h4 className="card-title">Educational Image {idx + 1}</h4>
+        <h4 className="card-title">{image.topic || `Educational Image ${idx + 1}`}</h4>
+        <p className="card-description">{image.description}</p>
         
-        {image.imageBase64 && (
-          <img 
-            src={`data:image/png;base64,${image.imageBase64}`} 
-            alt={`Educational image ${idx + 1}`}
-            className="diagram-image"
-          />
-        )}
-
-        {image.annotatedPoints?.length > 0 && (
-          <div className="elements-list">
-            <h5>Key Points:</h5>
-            <ul>
-              {image.annotatedPoints.map((point: any, i: number) => (
-                <li key={i}>
-                  <strong>{point.label}</strong>: {point.description}
-                </li>
-              ))}
-            </ul>
+        {hasImage && (
+          <div className="generated-image-container">
+            <img 
+              src={`data:image/png;base64,${imageBase64}`} 
+              alt={image.alt_text || `Educational image ${idx + 1}`}
+              className="generated-image"
+            />
+            <span className="ai-badge">AI Generated</span>
           </div>
         )}
 
-        {image.teacherScript && (
-          <div className="narration">
-            <p>{image.teacherScript}</p>
-          </div>
+        {image.generated && (
+          <div className="status-badge success">Image Generated</div>
         )}
       </div>
     );
   };
 
   const renderSimulation = (sim: any, idx: number) => {
-    const data = sim.simulation || sim;
+    const scene = sim.scene || {};
+    const objects = scene.objects || [];
+    
     return (
       <div key={idx} className="media-card">
-        <h4 className="card-title">{data.title || `3D Model ${idx + 1}`}</h4>
-        <p className="card-description">{data.description}</p>
-
-        {sim.previewImageBase64 && (
-          <img 
-            src={`data:image/png;base64,${sim.previewImageBase64}`} 
-            alt={data.title}
-            className="diagram-image"
-          />
+        <h4 className="card-title">{sim.title || `3D Model ${idx + 1}`}</h4>
+        
+        {sim.learning_goal && (
+          <p className="card-description">{sim.learning_goal}</p>
         )}
 
-        {(data.scene?.objects || data.objects) && (
+        {objects.length > 0 && (
           <div className="elements-list">
             <h5>3D Objects:</h5>
-            {typeof (data.scene?.objects || data.objects) === 'string' ? (
-              <p className="elements-text">{data.scene?.objects || data.objects}</p>
-            ) : Array.isArray(data.scene?.objects) && data.scene.objects.length > 0 ? (
-              <ul>
-                {data.scene.objects.map((obj: any, i: number) => (
-                  <li key={i}>
-                    <strong>{obj.name}</strong> ({obj.type})
-                    {obj.interactive && <span className="badge">Interactive</span>}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+            <div className="objects-grid">
+              {objects.map((obj: any, i: number) => (
+                <div key={i} className="object-chip" style={{ borderLeftColor: obj.color || '#667eea' }}>
+                  <strong>{obj.name}</strong>
+                  <span className="object-type">{obj.type}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         
-        {data.interactions && (
+        {sim.interactions && Array.isArray(sim.interactions) && (
           <div className="elements-list">
             <h5>Interactions:</h5>
-            {typeof data.interactions === 'string' ? (
-              <p className="elements-text">{data.interactions}</p>
-            ) : Array.isArray(data.interactions) ? (
-              <ul>
-                {data.interactions.map((int: string, i: number) => (
-                  <li key={i}>{int}</li>
-                ))}
-              </ul>
-            ) : null}
+            <div className="interaction-badges">
+              {sim.interactions.map((int: string, i: number) => (
+                <span key={i} className="interaction-badge">{int}</span>
+              ))}
+            </div>
           </div>
         )}
 
-        {sim.teacherGuide && (
-          <div className="narration">
-            <p>{sim.teacherGuide}</p>
+        {scene.animations && (
+          <div className="animation-note">
+            Animation: {scene.animations}
           </div>
         )}
       </div>
@@ -151,42 +135,28 @@ export default function MediaGallery({ diagrams, images, simulations, videos }: 
   };
 
   const renderVideo = (video: any, idx: number) => {
-    const storyboard = video.videoStoryboard || video;
     return (
       <div key={idx} className="media-card">
-        <h4 className="card-title">{storyboard.title || `Video ${idx + 1}`}</h4>
-        <p className="card-description">Duration: {storyboard.duration} | Style: {storyboard.style}</p>
+        <h4 className="card-title">{video.title || `Video ${idx + 1}`}</h4>
+        <p className="card-description">Duration: {video.duration} | Style: {video.style}</p>
 
-        {video.thumbnailBase64 && (
-          <img 
-            src={`data:image/png;base64,${video.thumbnailBase64}`} 
-            alt={storyboard.title}
-            className="diagram-image"
-          />
-        )}
-
-        {storyboard.scenes && (
+        {video.scenes && (
           <div className="elements-list">
-            <h5>Scenes:</h5>
-            {typeof storyboard.scenes === 'string' ? (
-              <p className="elements-text">{storyboard.scenes}</p>
-            ) : Array.isArray(storyboard.scenes) && storyboard.scenes.length > 0 ? (
-              <ol>
-                {storyboard.scenes.map((scene: any, i: number) => (
+            <h5>Storyboard:</h5>
+            {typeof video.scenes === 'string' ? (
+              <p className="elements-text storyboard">{video.scenes}</p>
+            ) : Array.isArray(video.scenes) && video.scenes.length > 0 ? (
+              <ol className="scenes-list">
+                {video.scenes.map((scene: any, i: number) => (
                   <li key={i}>
-                    <strong>{scene.duration}</strong>: {scene.visualDescription}
-                    <p className="scene-narration">"{scene.narration}"</p>
+                    <strong>{scene.duration || `Scene ${i + 1}`}</strong>: {scene.visualDescription || scene.description}
+                    {scene.narration && (
+                      <p className="scene-narration">"{scene.narration}"</p>
+                    )}
                   </li>
                 ))}
               </ol>
             ) : null}
-          </div>
-        )}
-
-        {video.fullNarrationScript && (
-          <div className="narration">
-            <h5>Full Script:</h5>
-            <p>{video.fullNarrationScript}</p>
           </div>
         )}
       </div>
@@ -198,19 +168,19 @@ export default function MediaGallery({ diagrams, images, simulations, videos }: 
       case 'diagrams':
         return diagrams.length > 0 
           ? diagrams.map(renderDiagram)
-          : <p className="no-content">No diagrams generated</p>;
+          : <p className="no-content">No diagrams generated for this topic</p>;
       case 'images':
         return images.length > 0 
           ? images.map(renderImage)
-          : <p className="no-content">No images generated</p>;
+          : <p className="no-content">No images generated for this topic</p>;
       case 'simulations':
         return simulations.length > 0 
           ? simulations.map(renderSimulation)
-          : <p className="no-content">No 3D simulations generated</p>;
+          : <p className="no-content">No 3D simulations needed for this topic</p>;
       case 'videos':
         return videos.length > 0 
           ? videos.map(renderVideo)
-          : <p className="no-content">No videos generated</p>;
+          : <p className="no-content">No videos needed for this topic</p>;
       default:
         return null;
     }
@@ -316,10 +286,40 @@ export default function MediaGallery({ diagrams, images, simulations, videos }: 
           margin-bottom: 16px;
         }
 
-        .diagram-image {
+        .generated-image-container {
+          position: relative;
+          margin-bottom: 16px;
+        }
+
+        .generated-image {
           width: 100%;
           border-radius: 8px;
-          margin-bottom: 16px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .ai-badge {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-weight: 600;
+        }
+
+        .status-badge {
+          display: inline-block;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-size: 0.8rem;
+          margin-top: 12px;
+        }
+
+        .status-badge.success {
+          background: rgba(46, 204, 113, 0.2);
+          color: #2ecc71;
         }
 
         .elements-list {
@@ -342,41 +342,77 @@ export default function MediaGallery({ diagrams, images, simulations, videos }: 
           margin: 8px 0;
         }
 
-        .badge {
-          background: rgba(102, 126, 234, 0.2);
-          color: #667eea;
-          padding: 2px 8px;
-          border-radius: 4px;
-          font-size: 0.75rem;
-          margin-left: 8px;
-        }
-
-        .narration {
-          margin-top: 16px;
-          padding: 16px;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 8px;
-          border-left: 3px solid #667eea;
-        }
-
-        .narration h5 {
-          color: #667eea;
-          margin-bottom: 8px;
-          font-size: 0.9rem;
-        }
-
-        .narration p {
+        .elements-text {
           color: #cbd5e0;
           font-size: 0.9rem;
           line-height: 1.6;
+        }
+
+        .storyboard {
+          white-space: pre-wrap;
+        }
+
+        .objects-grid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .object-chip {
+          background: rgba(255, 255, 255, 0.05);
+          padding: 8px 12px;
+          border-radius: 8px;
+          border-left: 3px solid;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .object-chip strong {
+          color: #fff;
+          font-size: 0.85rem;
+        }
+
+        .object-type {
+          color: #a0aec0;
+          font-size: 0.75rem;
+          text-transform: capitalize;
+        }
+
+        .interaction-badges {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+
+        .interaction-badge {
+          background: rgba(102, 126, 234, 0.2);
+          color: #667eea;
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-size: 0.8rem;
+        }
+
+        .animation-note {
+          margin-top: 12px;
+          padding: 10px;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 6px;
+          color: #a0aec0;
+          font-size: 0.85rem;
           font-style: italic;
         }
 
+        .scenes-list {
+          color: #cbd5e0;
+          font-size: 0.9rem;
+        }
+
         .scene-narration {
-          color: #a0aec0 !important;
-          font-style: italic !important;
+          color: #a0aec0;
+          font-style: italic;
           margin-top: 4px;
-          font-size: 0.85rem !important;
+          font-size: 0.85rem;
         }
 
         .no-content {

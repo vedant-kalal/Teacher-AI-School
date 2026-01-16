@@ -6,7 +6,7 @@ import MediaGallery from './components/MediaGallery';
 
 interface LessonArtifact {
   step: string;
-  status: 'pending' | 'running' | 'completed' | 'error';
+  status: 'pending' | 'running' | 'completed' | 'error' | 'skipped';
   data?: any;
 }
 
@@ -23,6 +23,7 @@ interface LessonState {
   videos: any[];
   lessonPlan: any | null;
   qualityReview: any | null;
+  contentPlan: any | null;
   error: string | null;
 }
 
@@ -39,6 +40,7 @@ const initialState: LessonState = {
   videos: [],
   lessonPlan: null,
   qualityReview: null,
+  contentPlan: null,
   error: null,
 };
 
@@ -109,6 +111,7 @@ export default function App() {
             videos: Array.isArray(result.videos) ? result.videos : [],
             lessonPlan: result.lessonPlan || null,
             qualityReview: result.qualityReview || null,
+            contentPlan: result.contentPlan || null,
           }));
         } else if (data.status === 'RUNNING') {
           const steps = data.steps || [];
@@ -145,11 +148,14 @@ export default function App() {
     setLesson(initialState);
   }, []);
 
+  const hasMedia = lesson.diagrams.length > 0 || lesson.images.length > 0 || 
+                   lesson.simulations.length > 0 || lesson.videos.length > 0;
+
   return (
     <div className="app">
       <header className="header">
         <h1>AI Teacher</h1>
-        <p>Interactive Educational Lessons</p>
+        <p>Interactive Educational Lessons with AI-Generated Content</p>
       </header>
 
       <main className="main-content">
@@ -173,9 +179,11 @@ export default function App() {
           lessonPlan={lesson.lessonPlan}
           status={lesson.status}
           topic={lesson.topic}
+          diagrams={lesson.diagrams}
+          images={lesson.images}
         />
 
-        {(lesson.diagrams.length > 0 || lesson.images.length > 0) && (
+        {hasMedia && (
           <MediaGallery 
             diagrams={lesson.diagrams}
             images={lesson.images}
