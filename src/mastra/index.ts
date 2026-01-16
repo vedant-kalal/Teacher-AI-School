@@ -10,10 +10,13 @@ import * as path from "path";
 
 import { sharedPostgresStorage } from "./storage";
 import { inngest, inngestServe } from "./inngest";
+import { loadLessonData } from "./tools/utils/lessonStorage";
 
 import { registerCronTrigger } from "../triggers/cronTriggers";
 import { aiTeacherAgent } from "./agents/aiTeacherAgent";
 import { aiTeacherWorkflow } from "./workflows/aiTeacherWorkflow";
+
+const workflowRuns = new Map<string, { status: string; result?: any; sessionId?: string }>();
 
 registerCronTrigger({
   cronExpression: process.env.SCHEDULE_CRON_EXPRESSION || "0 9 * * *",
@@ -108,6 +111,79 @@ export const mastra = new Mastra({
         path: "/api/inngest",
         method: "ALL",
         createHandler: async ({ mastra }) => inngestServe({ mastra, inngest }),
+      },
+      {
+        path: "/api/workflows/ai-teacher-workflow/start-async",
+        method: "POST",
+        createHandler: async ({ mastra }) => async (c) => {
+          const logger = mastra?.getLogger();
+          try {
+            const body = await c.req.json();
+            const topic = body?.inputData?.topic || "The Human Circulatory System";
+            
+            logger?.info("🎓 [UI Trigger] Starting lesson on:", { topic });
+            
+            const run = await aiTeacherWorkflow.createRunAsync();
+            const runId = run?.runId || `run_${Date.now()}`;
+            
+            workflowRuns.set(runId, { status: "RUNNING", sessionId: undefined });
+            
+            await inngest.send({
+              name: `workflow.ai-teacher-workflow`,
+              data: {
+                runId,
+                inputData: { topic },
+              },
+            });
+            
+            logger?.info("✅ [UI Trigger] Workflow started", { runId, topic });
+            
+            return c.json({ runId, status: "RUNNING" });
+          } catch (error) {
+            logger?.error("❌ [UI Trigger] Failed to start workflow:", { error });
+            return c.json({ error: "Failed to start workflow" }, 500);
+          }
+        },
+      },
+      {
+        path: "/api/workflows/ai-teacher-workflow/:runId",
+        method: "GET",
+        createHandler: async ({ mastra }) => async (c) => {
+          const logger = mastra?.getLogger();
+          const runId = c.req.param("runId");
+          
+          try {
+            const runInfo = workflowRuns.get(runId);
+            
+            if (!runInfo) {
+              return c.json({ 
+                runId, 
+                status: "RUNNING",
+                steps: [] 
+              });
+            }
+            
+            if (runInfo.sessionId) {
+              const lessonData = loadLessonData(runInfo.sessionId);
+              if (lessonData && lessonData.fullNarration) {
+                return c.json({
+                  runId,
+                  status: "COMPLETED",
+                  result: lessonData,
+                });
+              }
+            }
+            
+            return c.json({
+              runId,
+              status: runInfo.status,
+              result: runInfo.result,
+            });
+          } catch (error) {
+            logger?.error("❌ [UI] Failed to get workflow status:", { error, runId });
+            return c.json({ error: "Failed to get workflow status" }, 500);
+          }
+        },
       },
       {
         path: "/ui",
