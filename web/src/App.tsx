@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import StreamingBlackboard from './components/StreamingBlackboard';
 import TopicInput from './components/TopicInput';
-import LessonProgress from './components/LessonProgress';
 import { useLessonStream } from './hooks/useLessonStream';
 
 export default function App() {
@@ -28,49 +27,19 @@ export default function App() {
     stopLesson();
   }, [stopLesson]);
 
-  const getProgressStatus = () => {
-    switch (lessonState.status) {
-      case 'idle': return 'idle';
-      case 'starting': return 'running';
-      case 'running': return 'running';
-      case 'paused': return 'running';
-      case 'completed': return 'completed';
-      case 'error': return 'error';
-      default: return 'idle';
-    }
-  };
-
   return (
     <div className="app">
       <header className="header">
         <h1>🎓 AI Teacher</h1>
-        <p>Real-time Interactive Educational Lessons with Synchronized AI</p>
-      </header>
-
-      <main className="main-content">
         <TopicInput 
           onSubmit={handleStartLesson} 
           disabled={lessonState.status === 'running' || lessonState.status === 'starting'} 
           onReset={handleReset}
           showReset={lessonState.status !== 'idle'}
         />
+      </header>
 
-        {lessonState.status !== 'idle' && (
-          <LessonProgress 
-            status={getProgressStatus()}
-            currentStep={
-              lessonState.status === 'starting' 
-                ? 'Preparing lesson...' 
-                : lessonState.status === 'running'
-                ? `Teaching (${lessonState.currentSegmentIndex}% complete)`
-                : lessonState.status === 'completed'
-                ? 'Lesson Complete!'
-                : 'Error occurred'
-            }
-            topic={lessonState.topic}
-          />
-        )}
-
+      <main className="main-content">
         <StreamingBlackboard 
           boardState={boardState}
           isNarrating={isNarrating}
@@ -78,55 +47,76 @@ export default function App() {
           topic={lessonState.topic}
           title={lessonState.title}
         />
-
-        {isNarrating && (
-          <div className="narration-bar">
-            <div className="narration-icon">🔊</div>
-            <div className="narration-text">Teacher is speaking...</div>
-            <div className="narration-wave">
-              <span></span>
-              <span></span>
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-          </div>
-        )}
       </main>
 
+      {isNarrating && (
+        <div className="narration-bar">
+          <div className="narration-icon">🔊</div>
+          <div className="narration-text">Teacher is speaking...</div>
+          <div className="narration-wave">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        html, body, #root {
+          margin: 0;
+          padding: 0;
+          height: 100vh;
+          width: 100vw;
+          overflow: hidden !important;
+          position: fixed;
+          top: 0;
+          left: 0;
+        }
+
         .app {
-          min-height: 100vh;
-          padding: 20px;
-          max-width: 1400px;
-          margin: 0 auto;
+          height: 100vh;
+          width: 100vw;
+          overflow: hidden !important;
+          display: flex;
+          flex-direction: column;
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+          position: fixed;
+          top: 0;
+          left: 0;
+          padding: 10px 20px;
         }
 
         .header {
-          text-align: center;
-          margin-bottom: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          flex-shrink: 0;
+          padding: 10px 0;
         }
 
         .header h1 {
-          font-size: 2.8rem;
+          font-size: 1.8rem;
           font-weight: 700;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
-          margin-bottom: 8px;
-        }
-
-        .header p {
-          color: #a0aec0;
-          font-size: 1.1rem;
+          margin: 0;
+          white-space: nowrap;
         }
 
         .main-content {
+          flex: 1;
           display: flex;
-          flex-direction: column;
-          gap: 24px;
+          overflow: hidden !important;
+          min-height: 0;
         }
 
         .narration-bar {
@@ -134,10 +124,12 @@ export default function App() {
           align-items: center;
           justify-content: center;
           gap: 16px;
-          padding: 16px 24px;
+          padding: 12px 24px;
           background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
           border-radius: 12px;
           border: 1px solid rgba(102, 126, 234, 0.3);
+          flex-shrink: 0;
+          margin-top: 10px;
         }
 
         .narration-icon {
