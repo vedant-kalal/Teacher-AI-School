@@ -115,3 +115,6 @@ curl -X POST http://localhost:5000/api/stream/lesson/start \
 - Visual planning: Intelligent pre-analysis of script for optimal visual timing
 - Target audience: High school students
 - LLM: GPT-4o for visual planning, GPT-4o-mini for fast responses
+- Blackboard: Fixed 600px height, magical text clearing animation when full
+- Images: Persist until next teaching segment starts
+- Narration: Enhanced agent describes both board text AND visual content in sync
