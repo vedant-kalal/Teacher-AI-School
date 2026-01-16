@@ -8,6 +8,8 @@ import {
   BoardState,
   BoardLine,
   LessonState,
+  BoardLayout,
+  DEFAULT_LAYOUT,
   cleanTextForBoard,
   BoardWriteStyle,
 } from '../types/events';
@@ -49,6 +51,7 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
     lines: [],
     currentMedia: null,
     isClearing: false,
+    layout: DEFAULT_LAYOUT,
   });
 
   const [currentNarration, setCurrentNarration] = useState<NarrationSegment | null>(null);
@@ -254,6 +257,22 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
           currentSegmentIndex: Math.floor(data.progress * 100),
         }));
         break;
+
+      case EventType.LAYOUT_UPDATE: {
+        const newLayout: BoardLayout = {
+          text_size: data.text_size || 'large',
+          text_width_percent: data.text_width_percent || 60,
+          image_size: data.image_size || 'large',
+          image_width_percent: data.image_width_percent || 40,
+          image_position: data.image_position || 'right',
+          image_height_percent: data.image_height_percent || 70,
+          line_spacing: data.line_spacing || 'normal',
+          board_padding: data.board_padding || 'normal',
+          title_size: data.title_size || 'large',
+        };
+        setBoardState((prev) => ({ ...prev, layout: newLayout }));
+        break;
+      }
     }
   }, [options, animateText, speakText]);
 
@@ -273,6 +292,7 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
       lines: [],
       currentMedia: null,
       isClearing: false,
+      layout: DEFAULT_LAYOUT,
     });
 
     setDisplayedText('');

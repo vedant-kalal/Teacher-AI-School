@@ -21,6 +21,21 @@ class EventType(str, Enum):
     LESSON_END = "lesson_end"
     ERROR = "error"
     STATUS_UPDATE = "status_update"
+    LAYOUT_UPDATE = "layout_update"
+
+
+class BoardLayoutConfig(BaseModel):
+    """Board layout configuration decided by the Layout Agent"""
+    text_size: str = "large"
+    text_width_percent: int = 60
+    image_size: str = "large"
+    image_width_percent: int = 40
+    image_position: str = "right"
+    image_height_percent: int = 70
+    line_spacing: str = "normal"
+    board_padding: str = "normal"
+    title_size: str = "large"
+    layout_reason: str = ""
 
 
 class MediaType(str, Enum):

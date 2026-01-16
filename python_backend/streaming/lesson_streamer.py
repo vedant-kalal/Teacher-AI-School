@@ -114,6 +114,21 @@ class LessonStreamer:
             "status": status,
             "progress": progress
         })
+    
+    async def emit_layout_update(self, layout: dict):
+        """Emit a layout update event with dynamic board configuration"""
+        await self.emit_event(EventType.LAYOUT_UPDATE, {
+            "text_size": layout.get("text_size", "large"),
+            "text_width_percent": layout.get("text_width_percent", 60),
+            "image_size": layout.get("image_size", "large"),
+            "image_width_percent": layout.get("image_width_percent", 40),
+            "image_position": layout.get("image_position", "right"),
+            "image_height_percent": layout.get("image_height_percent", 70),
+            "line_spacing": layout.get("line_spacing", "normal"),
+            "board_padding": layout.get("board_padding", "normal"),
+            "title_size": layout.get("title_size", "large"),
+            "layout_reason": layout.get("layout_reason", "")
+        })
         
     async def get_events(self) -> AsyncGenerator[str, None]:
         self.is_running = True

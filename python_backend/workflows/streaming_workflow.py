@@ -18,7 +18,7 @@ from schemas.events import (
 from streaming.lesson_streamer import LessonStreamer, create_streamer, get_streamer, remove_streamer
 from agents.teaching_agents import (
     script_planner, script_analyzer, visual_coordinator, visual_generator,
-    narration_agent, board_writer, decider_agent
+    narration_agent, board_writer, decider_agent, layout_agent
 )
 
 
@@ -159,6 +159,8 @@ async def run_streaming_lesson(run_id: str, topic: str):
             
             segment_id = segment.get("segment_id", f"seg_{idx+1}")
             narration_text = segment.get("narration_text", "")
+            board_text = segment.get("board_text", "")
+            board_style = segment.get("board_style", "text")
             
             decision = await decider_agent.decide_next_action(
                 segment,
@@ -171,8 +173,35 @@ async def run_streaming_lesson(run_id: str, topic: str):
                 await asyncio.sleep(0.6)
                 current_content_lines = 0
             
-            board_text = segment.get("board_text", "")
-            board_style = segment.get("board_style", "text")
+            coordination = await visual_coordinator.coordinate_visuals(
+                visual_plan,
+                segment_id,
+                narration_text,
+                total_segments - idx - 1,
+                shown_visuals
+            )
+            
+            has_visual_this_segment = coordination.get("show_visual", False)
+            visual_info_for_layout = None
+            
+            if has_visual_this_segment:
+                visual_to_show = coordination.get("visual_to_show")
+                if visual_to_show and visual_to_show in visual_tasks:
+                    visual_info_for_layout = visual_tasks[visual_to_show].get("info")
+            
+            page_content = {
+                "lines": [{"text": board_text, "style": board_style}],
+                "segment_id": segment_id
+            }
+            layout_decision = await layout_agent.plan_page_layout(
+                page_content,
+                has_visual_this_segment,
+                visual_info_for_layout,
+                topic
+            )
+            
+            await streamer.emit_layout_update(layout_decision)
+            print(f"📐 [Layout] Segment {idx+1}: text={layout_decision.get('text_size')}, image={layout_decision.get('image_size')}, pos={layout_decision.get('image_position')}")
             
             formatted_board = await board_writer.format_board_content(board_text, board_style, topic)
             
@@ -188,22 +217,16 @@ async def run_streaming_lesson(run_id: str, topic: str):
             pacing = decision.get("pacing", "normal")
             char_delay = {"slow": 70, "normal": 50, "fast": 30}.get(pacing, 50)
             
+            text_size_from_layout = layout_decision.get("text_size", "medium")
+            
             board_event = BoardWriteEvent(
                 text=formatted_board,
                 style=style_map.get(board_style, BoardWriteStyle.TEXT),
                 color="white" if board_style != "highlight" else "yellow",
-                size="large" if board_style == "title" else "medium",
+                size=text_size_from_layout,
                 char_delay_ms=char_delay,
                 duration_ms=len(formatted_board) * char_delay,
                 sync_with_narration=True
-            )
-            
-            coordination = await visual_coordinator.coordinate_visuals(
-                visual_plan,
-                segment_id,
-                narration_text,
-                total_segments - idx - 1,
-                shown_visuals
             )
             
             visual_context = None

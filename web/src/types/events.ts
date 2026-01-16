@@ -11,6 +11,7 @@ export enum EventType {
   LESSON_END = 'lesson_end',
   ERROR = 'error',
   STATUS_UPDATE = 'status_update',
+  LAYOUT_UPDATE = 'layout_update',
 }
 
 export enum MediaType {
@@ -99,10 +100,35 @@ export interface LessonScript {
   formulas: string[];
 }
 
+export interface BoardLayout {
+  text_size: 'small' | 'medium' | 'large';
+  text_width_percent: number;
+  image_size: 'small' | 'medium' | 'large' | 'none';
+  image_width_percent: number;
+  image_position: 'right' | 'left' | 'top' | 'bottom' | 'none';
+  image_height_percent: number;
+  line_spacing: 'compact' | 'normal' | 'relaxed';
+  board_padding: 'minimal' | 'normal' | 'spacious';
+  title_size: 'normal' | 'large' | 'huge';
+}
+
+export const DEFAULT_LAYOUT: BoardLayout = {
+  text_size: 'large',
+  text_width_percent: 60,
+  image_size: 'large',
+  image_width_percent: 40,
+  image_position: 'right',
+  image_height_percent: 70,
+  line_spacing: 'normal',
+  board_padding: 'normal',
+  title_size: 'large',
+};
+
 export interface BoardState {
   lines: BoardLine[];
   currentMedia: MediaReadyEvent | null;
   isClearing: boolean;
+  layout: BoardLayout;
 }
 
 export interface BoardLine {

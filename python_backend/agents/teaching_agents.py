@@ -588,6 +588,168 @@ Return JSON only:
             }
 
 
+class BoardLayoutAgent:
+    """
+    Intelligent Board Layout Agent that decides the structure of each board page.
+    Controls: text size, image size, image position, board structure, spacing.
+    """
+    def __init__(self):
+        pass
+    
+    async def plan_page_layout(
+        self,
+        page_content: Dict[str, Any],
+        has_image: bool,
+        image_info: Optional[Dict[str, Any]] = None,
+        topic: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Decide the optimal layout for a board page based on content.
+        
+        Args:
+            page_content: What text will be on this page
+            has_image: Whether an image will be displayed
+            image_info: Details about the image (type, importance, etc.)
+            topic: The lesson topic
+        
+        Returns:
+            Layout configuration for the page
+        """
+        llm = get_llm("gpt-4o-mini", 0.5)
+        
+        text_lines = page_content.get("lines", [])
+        total_text = "\n".join([line.get("text", "") for line in text_lines])
+        text_length = len(total_text)
+        num_lines = len(text_lines)
+        
+        prompt = f"""You are an expert at designing educational blackboard layouts. 
+Analyze this content and decide the OPTIMAL layout for maximum readability and visual impact.
+
+CONTENT TO DISPLAY:
+Topic: {topic}
+Number of text lines: {num_lines}
+Total text length: {text_length} characters
+Text preview: {total_text[:200]}...
+
+HAS IMAGE: {has_image}
+{f"Image type: {image_info.get('visual_type', 'image')}" if image_info else ""}
+{f"Image importance: {image_info.get('importance', 'normal')}" if image_info else ""}
+{f"Image title: {image_info.get('title', '')}" if image_info else ""}
+
+Decide the optimal layout based on these rules:
+- If LOTS of text (>300 chars): use SMALL text, give text more space
+- If LITTLE text (<100 chars): use LARGE text for emphasis
+- If image is "critical" importance: make image LARGE (60% of board)
+- If image is "supplementary": make image SMALL (30% of board)
+- If no image: text can use FULL width
+- Consider visual balance between text and image
+
+Return JSON with layout decisions:
+{{
+  "text_size": "small" | "medium" | "large",
+  "text_width_percent": 40-100,
+  "image_size": "small" | "medium" | "large" | "none",
+  "image_width_percent": 0-60,
+  "image_position": "right" | "left" | "top" | "bottom" | "none",
+  "image_height_percent": 30-80,
+  "line_spacing": "compact" | "normal" | "relaxed",
+  "board_padding": "minimal" | "normal" | "spacious",
+  "title_size": "normal" | "large" | "huge",
+  "layout_reason": "Brief explanation of why this layout"
+}}"""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You design optimal blackboard layouts for educational content. Return JSON only."),
+                HumanMessage(content=prompt)
+            ])
+            
+            content = response.content.strip()
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
+            result = json.loads(content)
+            print(f"📐 [Layout Agent] Decided: text={result.get('text_size')}, image={result.get('image_size')}, position={result.get('image_position')}")
+            return result
+        except Exception as e:
+            print(f"Error in layout agent: {e}")
+            return self._default_layout(has_image, image_info)
+    
+    def _default_layout(self, has_image: bool, image_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Fallback layout when AI fails"""
+        if has_image:
+            importance = image_info.get("importance", "normal") if image_info else "normal"
+            if importance == "critical":
+                return {
+                    "text_size": "medium",
+                    "text_width_percent": 45,
+                    "image_size": "large",
+                    "image_width_percent": 55,
+                    "image_position": "right",
+                    "image_height_percent": 70,
+                    "line_spacing": "normal",
+                    "board_padding": "normal",
+                    "title_size": "large",
+                    "layout_reason": "Critical image gets prominence"
+                }
+            else:
+                return {
+                    "text_size": "medium",
+                    "text_width_percent": 60,
+                    "image_size": "medium",
+                    "image_width_percent": 40,
+                    "image_position": "right",
+                    "image_height_percent": 50,
+                    "line_spacing": "normal",
+                    "board_padding": "normal",
+                    "title_size": "normal",
+                    "layout_reason": "Balanced text and image"
+                }
+        else:
+            return {
+                "text_size": "large",
+                "text_width_percent": 100,
+                "image_size": "none",
+                "image_width_percent": 0,
+                "image_position": "none",
+                "image_height_percent": 0,
+                "line_spacing": "relaxed",
+                "board_padding": "spacious",
+                "title_size": "huge",
+                "layout_reason": "Text-only page, maximize readability"
+            }
+    
+    async def adjust_for_content_type(
+        self,
+        base_layout: Dict[str, Any],
+        content_type: str,
+        styles: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Fine-tune layout based on specific content types.
+        
+        Args:
+            base_layout: The initial layout decision
+            content_type: "formula", "bullet_list", "paragraph", "mixed"
+            styles: List of BoardWriteStyle values in the content
+        """
+        adjusted = base_layout.copy()
+        
+        if content_type == "formula" or "formula" in styles:
+            adjusted["text_size"] = "large"
+            adjusted["line_spacing"] = "relaxed"
+            adjusted["board_padding"] = "spacious"
+        
+        if content_type == "bullet_list" or styles.count("bullet") > 3:
+            adjusted["line_spacing"] = "compact"
+            adjusted["text_size"] = "medium"
+        
+        if "title" in styles:
+            adjusted["title_size"] = "huge"
+        
+        return adjusted
+
+
 script_planner = ScriptPlannerAgent()
 script_analyzer = ScriptAnalyzerAgent()
 visual_coordinator = VisualCoordinatorAgent()
@@ -595,3 +757,4 @@ visual_generator = VisualGeneratorAgent()
 narration_agent = NarrationAgent()
 board_writer = BoardWriterAgent()
 decider_agent = DeciderAgent()
+layout_agent = BoardLayoutAgent()

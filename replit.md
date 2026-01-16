@@ -28,6 +28,15 @@ The application uses a Python backend with LangGraph for lesson generation, with
 5. **NarrationAgent** - Expands narration text for natural teacher speaking style
 6. **BoardWriterAgent** - Formats text for clean blackboard display (no markdown, proper symbols)
 7. **DeciderAgent** - Controls lesson pacing and board clearing decisions
+8. **BoardLayoutAgent** - **NEW** Intelligent layout controller that decides board structure per segment:
+   - `text_size`: small/medium/large - Font size based on content amount
+   - `image_size`: small/medium/large - Image dimensions based on importance
+   - `image_position`: left/right/top/bottom/none - Where to place the image
+   - `text_width_percent`: 30-100% - How much space text takes
+   - `image_width_percent`: 0-70% - How much space image takes
+   - `line_spacing`: compact/normal/relaxed - Space between lines
+   - `board_padding`: minimal/normal/spacious - Board edge padding
+   - `title_size`: normal/large/huge - Title font size
 
 ### Visual Generation Flow
 
@@ -97,6 +106,7 @@ GET /ui - Interactive blackboard interface
 - `board_clear` - Clear board animation
 - `narration_segment` - Text for speech synthesis
 - `media_ready` - Image/diagram ready to display
+- `layout_update` - **NEW** Dynamic layout configuration from BoardLayoutAgent
 - `pause` - Pause between segments
 - `lesson_end` - Lesson complete with summary
 
@@ -115,6 +125,8 @@ curl -X POST http://localhost:5000/api/stream/lesson/start \
 - Visual planning: Intelligent pre-analysis of script for optimal visual timing
 - Target audience: High school students
 - LLM: GPT-4o for visual planning, GPT-4o-mini for fast responses
-- Blackboard: Fixed 600px height, magical text clearing animation when full
-- Images: Persist until next teaching segment starts
-- Narration: Enhanced agent describes both board text AND visual content in sync
+- Blackboard: Full-screen, edge-to-edge board with dynamic layout per segment
+- Layout: BoardLayoutAgent intelligently decides text size, image size/position based on content
+- Images: Large and prominent, positioned dynamically (left/right/top/bottom) based on content
+- Scrolling: Auto-scroll to new content as it appears
+- Narration: Speaking indicator shows during board writing, synced with text animation
