@@ -31,13 +31,17 @@ export default function App() {
     <div className="app">
       <header className="header">
         <h1>🎓 AI Teacher</h1>
+        <p className="subtitle">Real-time Interactive Lessons</p>
+      </header>
+
+      <div className="controls">
         <TopicInput 
           onSubmit={handleStartLesson} 
           disabled={lessonState.status === 'running' || lessonState.status === 'starting'} 
           onReset={handleReset}
           showReset={lessonState.status !== 'idle'}
         />
-      </header>
+      </div>
 
       <main className="main-content">
         <StreamingBlackboard 
@@ -51,64 +55,63 @@ export default function App() {
 
       {isNarrating && (
         <div className="narration-bar">
-          <div className="narration-icon">🔊</div>
-          <div className="narration-text">Teacher is speaking...</div>
-          <div className="narration-wave">
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
+          <span className="narration-icon">🔊</span>
+          <span>Teacher is speaking...</span>
+          <div className="wave">
+            <span></span><span></span><span></span><span></span><span></span>
           </div>
         </div>
       )}
 
       <style>{`
-        * {
-          box-sizing: border-box;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         html, body, #root {
-          margin: 0;
-          padding: 0;
           height: 100%;
           width: 100%;
           overflow: hidden;
         }
 
         .app {
-          height: 100vh;
-          width: 100vw;
-          overflow: hidden;
+          min-height: 100vh;
           display: flex;
           flex-direction: column;
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-          padding: 15px 20px;
+          padding: 15px 30px;
+          overflow: hidden;
         }
 
         .header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 20px;
+          text-align: center;
           flex-shrink: 0;
-          padding-bottom: 15px;
+          margin-bottom: 10px;
         }
 
         .header h1 {
-          font-size: 1.8rem;
+          font-size: 2rem;
           font-weight: 700;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
-          margin: 0;
-          white-space: nowrap;
+        }
+
+        .subtitle {
+          color: #a0aec0;
+          font-size: 0.95rem;
+          margin-top: 4px;
+        }
+
+        .controls {
+          flex-shrink: 0;
+          margin-bottom: 15px;
         }
 
         .main-content {
           flex: 1;
           display: flex;
+          align-items: center;
+          justify-content: center;
           min-height: 0;
           overflow: hidden;
         }
@@ -117,52 +120,47 @@ export default function App() {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 16px;
-          padding: 10px 24px;
-          background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
-          border-radius: 12px;
+          gap: 12px;
+          padding: 10px 20px;
+          background: rgba(102, 126, 234, 0.15);
+          border-radius: 10px;
           border: 1px solid rgba(102, 126, 234, 0.3);
-          flex-shrink: 0;
           margin-top: 10px;
+          flex-shrink: 0;
+          color: #fff;
+          font-size: 1rem;
         }
 
         .narration-icon {
-          font-size: 1.5rem;
+          font-size: 1.3rem;
           animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
           0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
+          50% { transform: scale(1.15); }
         }
 
-        .narration-text {
-          color: #fff;
-          font-size: 1.1rem;
-          font-weight: 500;
-        }
-
-        .narration-wave {
+        .wave {
           display: flex;
-          gap: 4px;
+          gap: 3px;
           align-items: center;
-          height: 24px;
         }
 
-        .narration-wave span {
-          width: 4px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .wave span {
+          width: 3px;
+          background: linear-gradient(135deg, #667eea, #764ba2);
           border-radius: 2px;
-          animation: wave 1s ease-in-out infinite;
+          animation: waveAnim 1s ease-in-out infinite;
         }
 
-        .narration-wave span:nth-child(1) { height: 8px; animation-delay: 0s; }
-        .narration-wave span:nth-child(2) { height: 16px; animation-delay: 0.1s; }
-        .narration-wave span:nth-child(3) { height: 24px; animation-delay: 0.2s; }
-        .narration-wave span:nth-child(4) { height: 16px; animation-delay: 0.3s; }
-        .narration-wave span:nth-child(5) { height: 8px; animation-delay: 0.4s; }
+        .wave span:nth-child(1) { height: 6px; animation-delay: 0s; }
+        .wave span:nth-child(2) { height: 12px; animation-delay: 0.1s; }
+        .wave span:nth-child(3) { height: 18px; animation-delay: 0.2s; }
+        .wave span:nth-child(4) { height: 12px; animation-delay: 0.3s; }
+        .wave span:nth-child(5) { height: 6px; animation-delay: 0.4s; }
 
-        @keyframes wave {
+        @keyframes waveAnim {
           0%, 100% { transform: scaleY(1); }
           50% { transform: scaleY(0.5); }
         }
