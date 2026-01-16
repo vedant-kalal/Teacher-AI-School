@@ -4,6 +4,7 @@ modules = ["python-3.11", "bash", "web", "nodejs-22"]
 stack = "AGENT_STACK"
 automationTriggerConnectorName = "legacy_timebased"
 integrations = ["javascript_openai_ai_integrations:2.0.0"]
+expertMode = true
 
 [nix]
 channel = "stable-25_05"

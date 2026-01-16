@@ -1,6 +1,6 @@
 """
 Multi-Agent Teaching System
-Parallel agents for synchronized AI teaching experience
+Advanced parallel agents for synchronized AI teaching experience with intelligent visual planning
 """
 import os
 import asyncio
@@ -9,6 +9,7 @@ import re
 from typing import Dict, Any, List, Optional, Tuple
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
+
 
 def get_llm(model: str = "gpt-4o-mini", temperature: float = 0.7) -> ChatOpenAI:
     return ChatOpenAI(
@@ -21,9 +22,10 @@ def get_llm(model: str = "gpt-4o-mini", temperature: float = 0.7) -> ChatOpenAI:
 
 class ScriptPlannerAgent:
     def __init__(self):
-        self.llm = get_llm("gpt-4o-mini", 0.7)
+        pass
     
     async def plan_lesson_script(self, topic: str) -> Dict[str, Any]:
+        llm = get_llm("gpt-4o-mini", 0.7)
         prompt = f"""You are an expert educational content planner. Create a comprehensive, engaging lesson script for teaching about: {topic}
 
 Create a detailed lesson with 8-12 segments. Each segment should feel like a real teacher explaining in class.
@@ -33,7 +35,7 @@ For EACH segment, provide:
 2. board_text: What appears on the board (clean text, NO markdown symbols like # or *, use → for arrows, use actual math symbols)
 3. board_style: "title", "heading", "text", "formula", "bullet", or "highlight"
 4. needs_visual: true if this segment needs a diagram or image
-5. visual_type: "diagram" or "image" (only if needs_visual is true)
+5. visual_type: "diagram", "image", "3d_model", or "video" (only if needs_visual is true)
 6. visual_prompt: A detailed prompt for generating the visual (only if needs_visual is true)
 7. clear_board: true if the board should be cleared before this segment
 
@@ -73,7 +75,7 @@ Return ONLY valid JSON in this format:
 }}"""
 
         try:
-            response = await self.llm.ainvoke([
+            response = await llm.ainvoke([
                 SystemMessage(content="You are an educational content planner. Always respond with valid JSON only."),
                 HumanMessage(content=prompt)
             ])
@@ -123,11 +125,261 @@ Return ONLY valid JSON in this format:
         }
 
 
+class ScriptAnalyzerAgent:
+    """
+    Analyzes the FULL teaching script upfront to plan all visual content.
+    This agent receives the complete script and decides what visuals are needed for each segment.
+    """
+    def __init__(self):
+        pass
+    
+    async def analyze_script_for_visuals(self, script: Dict[str, Any], topic: str) -> Dict[str, Any]:
+        llm = get_llm("gpt-4o", 0.6)
+        
+        full_script_text = self._extract_full_script_text(script)
+        
+        prompt = f"""You are an expert educational visual planner. You have the COMPLETE teaching script for a lesson about "{topic}".
+
+FULL SCRIPT:
+{full_script_text}
+
+Your job is to analyze this entire script and plan ALL visual content (images, diagrams, 3D models, videos) that should be shown during the lesson.
+
+For each visual, consider:
+1. What moment in the narration would benefit most from a visual?
+2. What type of visual would best illustrate the concept?
+3. What should the visual contain to match what the teacher is explaining?
+
+Create a comprehensive visual plan with these types:
+- "image": Realistic photos or illustrations (planets, animals, objects, people, places)
+- "diagram": Educational diagrams, flowcharts, concept maps, labeled illustrations
+- "3d_model": 3D visualizations (molecules, geometric shapes, mechanical parts, anatomy)
+- "video": Short animated sequences (processes, transformations, movements)
+
+Return ONLY valid JSON:
+{{
+  "visual_plan": [
+    {{
+      "visual_id": "vis_1",
+      "target_segment_id": "seg_2",
+      "visual_type": "diagram",
+      "trigger_phrase": "The exact phrase in narration when this visual should appear",
+      "title": "Short title for the visual",
+      "detailed_prompt": "Very detailed prompt for generating this visual, including style, colors, elements to include, labels, etc.",
+      "importance": "critical" | "important" | "supplementary",
+      "display_duration_ms": 5000,
+      "position": "right" | "left" | "center" | "fullscreen"
+    }}
+  ],
+  "total_visuals": 5,
+  "visual_summary": "Brief summary of the visual strategy for this lesson"
+}}
+
+Create 4-8 strategically placed visuals that enhance the learning experience."""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You are an expert at planning educational visuals. Analyze the full script and plan visuals strategically."),
+                HumanMessage(content=prompt)
+            ])
+            
+            content = response.content.strip()
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
+            result = json.loads(content)
+            print(f"📊 [Script Analyzer] Planned {len(result.get('visual_plan', []))} visuals for lesson")
+            return result
+        except Exception as e:
+            print(f"Error in script analyzer: {e}")
+            return {"visual_plan": [], "total_visuals": 0, "visual_summary": "Analysis failed"}
+    
+    def _extract_full_script_text(self, script: Dict[str, Any]) -> str:
+        lines = []
+        lines.append(f"Title: {script.get('title', 'Untitled')}")
+        lines.append(f"Introduction: {script.get('introduction', '')}")
+        lines.append("")
+        
+        for seg in script.get("segments", []):
+            lines.append(f"[{seg.get('segment_id', 'unknown')}]")
+            lines.append(f"Board ({seg.get('board_style', 'text')}): {seg.get('board_text', '')}")
+            lines.append(f"Narration: {seg.get('narration_text', '')}")
+            lines.append("")
+        
+        return "\n".join(lines)
+
+
+class VisualCoordinatorAgent:
+    """
+    Coordinates the timing and sequencing of visual content during lesson delivery.
+    Receives the visual plan and current lesson state to decide what to show and when.
+    """
+    def __init__(self):
+        pass
+    
+    async def coordinate_visuals(
+        self,
+        visual_plan: List[Dict[str, Any]],
+        current_segment_id: str,
+        current_narration: str,
+        segments_remaining: int,
+        already_shown: List[str]
+    ) -> Dict[str, Any]:
+        llm = get_llm("gpt-4o-mini", 0.5)
+        
+        available_visuals = [v for v in visual_plan if v.get("visual_id") not in already_shown]
+        
+        if not available_visuals:
+            return {"show_visual": False, "visual_to_show": None, "reason": "No visuals remaining"}
+        
+        prompt = f"""You are coordinating visual content for an AI lesson.
+
+Current segment: {current_segment_id}
+Current narration: "{current_narration}"
+Segments remaining: {segments_remaining}
+Already shown visuals: {already_shown}
+
+Available visuals to show:
+{json.dumps(available_visuals, indent=2)}
+
+Decide:
+1. Should we show a visual right now? (based on trigger_phrase matching current narration)
+2. If yes, which visual? (prioritize by importance and relevance to current narration)
+3. How long to display it?
+
+Return JSON only:
+{{
+  "show_visual": true/false,
+  "visual_to_show": "visual_id or null",
+  "display_duration_ms": 5000,
+  "reason": "Brief explanation of decision"
+}}"""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You coordinate visual timing in educational lessons. Be strategic about when to show visuals."),
+                HumanMessage(content=prompt)
+            ])
+            
+            content = response.content.strip()
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
+            return json.loads(content)
+        except Exception as e:
+            print(f"Error in visual coordinator: {e}")
+            segment_visuals = [v for v in available_visuals if v.get("target_segment_id") == current_segment_id]
+            if segment_visuals:
+                return {
+                    "show_visual": True,
+                    "visual_to_show": segment_visuals[0].get("visual_id"),
+                    "display_duration_ms": 5000,
+                    "reason": "Default to segment's planned visual"
+                }
+            return {"show_visual": False, "visual_to_show": None, "reason": "No matching visual"}
+
+
+class VisualGeneratorAgent:
+    """
+    Generates visual content with FULL script context for accuracy.
+    Receives the entire script to understand what the teacher is explaining.
+    """
+    def __init__(self):
+        pass
+    
+    async def generate_enhanced_prompt(
+        self,
+        visual_info: Dict[str, Any],
+        full_script: Dict[str, Any],
+        topic: str
+    ) -> Dict[str, Any]:
+        llm = get_llm("gpt-4o", 0.7)
+        
+        script_context = self._get_relevant_context(visual_info, full_script)
+        
+        prompt = f"""You are creating a detailed prompt for generating an educational {visual_info.get('visual_type', 'image')}.
+
+TOPIC: {topic}
+
+FULL CONTEXT (what the teacher is explaining):
+{script_context}
+
+VISUAL REQUEST:
+Title: {visual_info.get('title', 'Educational Visual')}
+Original Prompt: {visual_info.get('detailed_prompt', '')}
+Type: {visual_info.get('visual_type', 'image')}
+Importance: {visual_info.get('importance', 'important')}
+
+Create the BEST possible prompt for generating this visual. Include:
+1. Specific visual elements to include
+2. Style and aesthetic (educational, professional, clear)
+3. Colors and composition
+4. Labels or annotations if needed
+5. Scale and perspective
+
+For 3D models: describe the 3D structure, materials, lighting
+For diagrams: describe layout, arrows, labels, color coding
+For videos: describe the animation sequence, transitions
+
+Return JSON:
+{{
+  "enhanced_prompt": "The complete, detailed prompt for image/diagram generation",
+  "style_hints": "Additional style guidance",
+  "negative_prompt": "What to avoid in the generation",
+  "recommended_size": "1024x1024 or 1024x768",
+  "visual_type": "image|diagram|3d_model|video"
+}}"""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You create detailed prompts for educational visual content. Be specific and descriptive."),
+                HumanMessage(content=prompt)
+            ])
+            
+            content = response.content.strip()
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
+            result = json.loads(content)
+            print(f"🎨 [Visual Generator] Enhanced prompt for: {visual_info.get('title', 'visual')}")
+            return result
+        except Exception as e:
+            print(f"Error generating enhanced prompt: {e}")
+            return {
+                "enhanced_prompt": visual_info.get('detailed_prompt', f"Educational illustration about {topic}"),
+                "style_hints": "Professional, educational, clear",
+                "negative_prompt": "blurry, text, watermark",
+                "recommended_size": "1024x1024",
+                "visual_type": visual_info.get('visual_type', 'image')
+            }
+    
+    def _get_relevant_context(self, visual_info: Dict[str, Any], full_script: Dict[str, Any]) -> str:
+        target_segment = visual_info.get("target_segment_id", "")
+        
+        lines = [f"Topic: {full_script.get('title', 'Unknown')}"]
+        lines.append(f"Introduction: {full_script.get('introduction', '')}")
+        lines.append("")
+        
+        found_target = False
+        for seg in full_script.get("segments", []):
+            if seg.get("segment_id") == target_segment:
+                found_target = True
+                lines.append(">>> TARGET SEGMENT (visual should match this) <<<")
+            
+            lines.append(f"[{seg.get('segment_id')}] {seg.get('narration_text', '')}")
+            
+            if found_target and seg.get("segment_id") != target_segment:
+                break
+        
+        return "\n".join(lines)
+
+
 class NarrationAgent:
     def __init__(self):
-        self.llm = get_llm("gpt-4o-mini", 0.8)
+        pass
     
     async def expand_narration(self, base_text: str, topic: str, context: str = "") -> str:
+        llm = get_llm("gpt-4o-mini", 0.8)
         prompt = f"""Expand this narration for a teacher explaining {topic}:
 
 Original: "{base_text}"
@@ -142,7 +394,7 @@ Make it:
 Return ONLY the expanded narration text, nothing else."""
 
         try:
-            response = await self.llm.ainvoke([
+            response = await llm.ainvoke([
                 SystemMessage(content="You are a friendly, engaging teacher. Speak naturally."),
                 HumanMessage(content=prompt)
             ])
@@ -154,9 +406,10 @@ Return ONLY the expanded narration text, nothing else."""
 
 class BoardWriterAgent:
     def __init__(self):
-        self.llm = get_llm("gpt-4o-mini", 0.5)
+        pass
     
     async def format_board_content(self, text: str, style: str, topic: str) -> str:
+        llm = get_llm("gpt-4o-mini", 0.5)
         prompt = f"""Format this text for a teacher's blackboard about {topic}:
 
 Text: "{text}"
@@ -173,7 +426,7 @@ Rules:
 Return ONLY the formatted board text."""
 
         try:
-            response = await self.llm.ainvoke([
+            response = await llm.ainvoke([
                 SystemMessage(content="You format text for educational blackboards. Clean, visual, engaging."),
                 HumanMessage(content=prompt)
             ])
@@ -203,7 +456,7 @@ Return ONLY the formatted board text."""
 
 class DeciderAgent:
     def __init__(self):
-        self.llm = get_llm("gpt-4o-mini", 0.6)
+        pass
     
     async def decide_next_action(
         self, 
@@ -211,6 +464,7 @@ class DeciderAgent:
         segments_remaining: int,
         board_fill_percentage: float
     ) -> Dict[str, Any]:
+        llm = get_llm("gpt-4o-mini", 0.6)
         prompt = f"""You are directing an AI lesson. Current state:
 - Current segment: {json.dumps(current_segment, indent=2)}
 - Segments remaining: {segments_remaining}
@@ -226,7 +480,7 @@ Return JSON only:
 {{"should_clear_board": bool, "should_generate_visual": bool, "visual_priority": int, "pacing": "normal"}}"""
 
         try:
-            response = await self.llm.ainvoke([
+            response = await llm.ainvoke([
                 SystemMessage(content="You control lesson pacing. Respond with JSON only."),
                 HumanMessage(content=prompt)
             ])
@@ -246,35 +500,10 @@ Return JSON only:
             }
 
 
-class VisualGeneratorAgent:
-    def __init__(self):
-        self.llm = get_llm("gpt-4o-mini", 0.7)
-    
-    async def generate_visual_prompt(self, base_prompt: str, visual_type: str, topic: str) -> str:
-        enhancement_prompt = f"""Enhance this prompt for generating an educational {visual_type} about {topic}:
-
-Original: "{base_prompt}"
-
-Make it:
-- Detailed and specific
-- Educational style
-- Clean, clear visuals
-- Professional quality
-
-Return ONLY the enhanced prompt, nothing else."""
-
-        try:
-            response = await self.llm.ainvoke([
-                SystemMessage(content="You create detailed prompts for educational visuals."),
-                HumanMessage(content=enhancement_prompt)
-            ])
-            return response.content.strip()
-        except Exception as e:
-            return base_prompt
-
-
 script_planner = ScriptPlannerAgent()
+script_analyzer = ScriptAnalyzerAgent()
+visual_coordinator = VisualCoordinatorAgent()
+visual_generator = VisualGeneratorAgent()
 narration_agent = NarrationAgent()
 board_writer = BoardWriterAgent()
 decider_agent = DeciderAgent()
-visual_generator = VisualGeneratorAgent()

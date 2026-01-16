@@ -1,13 +1,13 @@
 """
 Streaming Lesson Workflow
-Real-time synchronized lesson delivery with parallel content generation
+Real-time synchronized lesson delivery with intelligent visual planning
 """
 import asyncio
 import uuid
 import os
 import base64
 import httpx
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from schemas.events import (
@@ -15,9 +15,10 @@ from schemas.events import (
     BoardWriteEvent, NarrationSegment, MediaReadyEvent,
     clean_text_for_board, format_formula_for_board
 )
-from streaming.lesson_streamer import LessonStreamer, create_streamer, remove_streamer
+from streaming.lesson_streamer import LessonStreamer, create_streamer, get_streamer, remove_streamer
 from agents.teaching_agents import (
-    script_planner, narration_agent, board_writer, decider_agent, visual_generator
+    script_planner, script_analyzer, visual_coordinator, visual_generator,
+    narration_agent, board_writer, decider_agent
 )
 
 
@@ -25,9 +26,29 @@ OPENAI_BASE_URL = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
 OPENAI_API_KEY = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
 
 
-async def generate_image_async(prompt: str, topic: str) -> Optional[Dict[str, Any]]:
+def get_media_type(visual_type: str) -> MediaType:
+    type_map = {
+        "image": MediaType.IMAGE,
+        "diagram": MediaType.DIAGRAM,
+        "3d_model": MediaType.SIMULATION,
+        "video": MediaType.VIDEO
+    }
+    return type_map.get(visual_type, MediaType.IMAGE)
+
+
+async def generate_image_async(prompt: str, topic: str, visual_type: str = "image") -> Optional[Dict[str, Any]]:
+    print(f"🎨 [Image Gen] Starting generation for: {prompt[:50]}...")
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            style_suffix = {
+                "image": "Photorealistic, high quality, detailed",
+                "diagram": "Clean educational diagram, labeled, professional infographic style",
+                "3d_model": "3D rendered visualization, clear lighting, detailed textures",
+                "video": "Key frame from educational animation, dynamic"
+            }.get(visual_type, "Educational, professional")
+            
+            full_prompt = f"{prompt}. Style: {style_suffix}. Topic: {topic}."
+            
             response = await client.post(
                 f"{OPENAI_BASE_URL}/images/generations",
                 headers={
@@ -36,10 +57,10 @@ async def generate_image_async(prompt: str, topic: str) -> Optional[Dict[str, An
                 },
                 json={
                     "model": "gpt-image-1",
-                    "prompt": f"Educational illustration: {prompt}. Professional, clear, informative style suitable for teaching {topic}.",
+                    "prompt": full_prompt,
                     "n": 1,
                     "size": "1024x1024",
-                    "quality": "standard"
+                    "quality": "medium"
                 }
             )
             
@@ -47,26 +68,28 @@ async def generate_image_async(prompt: str, topic: str) -> Optional[Dict[str, An
                 data = response.json()
                 if data.get("data") and len(data["data"]) > 0:
                     image_data = data["data"][0]
+                    print(f"✅ [Image Gen] Successfully generated image for: {prompt[:30]}...")
                     if "b64_json" in image_data:
                         return {
                             "image_base64": image_data["b64_json"],
-                            "prompt": prompt
+                            "prompt": prompt,
+                            "visual_type": visual_type
                         }
                     elif "url" in image_data:
                         return {
                             "image_url": image_data["url"],
-                            "prompt": prompt
+                            "prompt": prompt,
+                            "visual_type": visual_type
                         }
             else:
-                print(f"Image generation failed: {response.status_code} - {response.text}")
+                print(f"❌ [Image Gen] Failed: {response.status_code} - {response.text[:200]}")
                 return None
     except Exception as e:
-        print(f"Error generating image: {e}")
+        print(f"❌ [Image Gen] Error: {e}")
         return None
 
 
 async def run_streaming_lesson(run_id: str, topic: str):
-    from streaming.lesson_streamer import get_streamer
     streamer = get_streamer(run_id)
     if not streamer:
         streamer = create_streamer(run_id, topic)
@@ -78,27 +101,64 @@ async def run_streaming_lesson(run_id: str, topic: str):
         print(f"🆔 Run ID: {run_id}")
         print(f"{'='*60}\n")
         
-        await streamer.emit_status_update("Planning lesson...", 0.1)
+        await streamer.emit_status_update("Planning lesson script...", 0.05)
         
         script = await script_planner.plan_lesson_script(topic)
         title = script.get("title", f"📚 {topic}")
         segments = script.get("segments", [])
         
-        print(f"✅ Lesson plan created with {len(segments)} segments")
+        print(f"✅ Lesson script created with {len(segments)} segments")
+        
+        await streamer.emit_status_update("Analyzing script for visual content...", 0.1)
+        
+        visual_plan_result = await script_analyzer.analyze_script_for_visuals(script, topic)
+        visual_plan = visual_plan_result.get("visual_plan", [])
+        
+        print(f"📊 Visual plan: {len(visual_plan)} visuals planned")
+        print(f"📝 Visual strategy: {visual_plan_result.get('visual_summary', 'N/A')}")
+        
+        await streamer.emit_status_update("Pre-generating visual content...", 0.15)
+        
+        visual_tasks: Dict[str, asyncio.Task] = {}
+        generated_visuals: Dict[str, Dict[str, Any]] = {}
+        
+        for visual in visual_plan:
+            visual_id = visual.get("visual_id")
+            if not visual_id:
+                visual_id = str(uuid.uuid4())
+                visual["visual_id"] = visual_id
+            
+            enhanced = await visual_generator.generate_enhanced_prompt(visual, script, topic)
+            
+            task = asyncio.create_task(
+                generate_image_async(
+                    enhanced.get("enhanced_prompt", visual.get("detailed_prompt", "")),
+                    topic,
+                    enhanced.get("visual_type", visual.get("visual_type", "image"))
+                )
+            )
+            visual_tasks[visual_id] = {
+                "task": task,
+                "info": visual,
+                "enhanced": enhanced
+            }
+            
+            print(f"🚀 [Pre-Gen] Started generation for: {visual.get('title', visual_id)}")
         
         await streamer.emit_lesson_start(title)
         await asyncio.sleep(0.5)
         
         total_segments = len(segments)
-        board_fill = 0
         current_content_lines = 0
         max_board_lines = 12
-        
-        pending_image_tasks = []
+        shown_visuals: List[str] = []
         
         for idx, segment in enumerate(segments):
-            progress = (idx + 1) / total_segments
+            progress = 0.2 + (idx / total_segments) * 0.7
             await streamer.emit_status_update(f"Teaching segment {idx + 1}/{total_segments}", progress)
+            
+            segment_id = segment.get("segment_id", f"seg_{idx+1}")
+            narration_text = segment.get("narration_text", "")
             
             decision = await decider_agent.decide_next_action(
                 segment,
@@ -110,27 +170,11 @@ async def run_streaming_lesson(run_id: str, topic: str):
                 await streamer.emit_board_clear("fade")
                 await asyncio.sleep(0.6)
                 current_content_lines = 0
-                board_fill = 0
             
             board_text = segment.get("board_text", "")
             board_style = segment.get("board_style", "text")
-            narration_text = segment.get("narration_text", "")
             
             formatted_board = await board_writer.format_board_content(board_text, board_style, topic)
-            
-            if segment.get("needs_visual") and decision.get("should_generate_visual"):
-                visual_prompt = segment.get("visual_prompt", f"Educational illustration about {topic}")
-                visual_type = segment.get("visual_type", "image")
-                
-                enhanced_prompt = await visual_generator.generate_visual_prompt(visual_prompt, visual_type, topic)
-                
-                image_task = asyncio.create_task(generate_image_async(enhanced_prompt, topic))
-                pending_image_tasks.append({
-                    "task": image_task,
-                    "segment_idx": idx,
-                    "prompt": enhanced_prompt,
-                    "type": visual_type
-                })
             
             style_map = {
                 "title": BoardWriteStyle.TITLE,
@@ -174,25 +218,85 @@ async def run_streaming_lesson(run_id: str, topic: str):
             lines_added = formatted_board.count('\n') + 1
             current_content_lines += lines_added
             
+            coordination = await visual_coordinator.coordinate_visuals(
+                visual_plan,
+                segment_id,
+                expanded_narration,
+                total_segments - idx - 1,
+                shown_visuals
+            )
+            
+            if coordination.get("show_visual"):
+                print(f"🎯 [Coordinator] Decision: Show '{coordination.get('visual_to_show')}' - {coordination.get('reason', 'N/A')}")
+                visual_to_show = coordination.get("visual_to_show")
+                
+                if visual_to_show and visual_to_show in visual_tasks:
+                    task_info = visual_tasks[visual_to_show]
+                    task = task_info["task"]
+                    
+                    if task.done():
+                        result = task.result()
+                        if result:
+                            visual_info = task_info["info"]
+                            media = MediaReadyEvent(
+                                media_type=get_media_type(visual_info.get("visual_type", "image")),
+                                title=visual_info.get("title", "Visual"),
+                                description=visual_info.get("detailed_prompt", "")[:100],
+                                image_base64=result.get("image_base64"),
+                                image_url=result.get("image_url"),
+                                display_on_board=True,
+                                display_duration_ms=coordination.get("display_duration_ms", 5000)
+                            )
+                            await streamer.emit_media_ready(media)
+                            shown_visuals.append(visual_to_show)
+                            print(f"📸 [Visual] Displayed: {visual_info.get('title', visual_to_show)}")
+                    else:
+                        try:
+                            result = await asyncio.wait_for(task, timeout=15)
+                            if result:
+                                visual_info = task_info["info"]
+                                media = MediaReadyEvent(
+                                    media_type=get_media_type(visual_info.get("visual_type", "image")),
+                                    title=visual_info.get("title", "Visual"),
+                                    description=visual_info.get("detailed_prompt", "")[:100],
+                                    image_base64=result.get("image_base64"),
+                                    image_url=result.get("image_url"),
+                                    display_on_board=True,
+                                    display_duration_ms=coordination.get("display_duration_ms", 5000)
+                                )
+                                await streamer.emit_media_ready(media)
+                                shown_visuals.append(visual_to_show)
+                                print(f"📸 [Visual] Displayed (waited): {visual_info.get('title', visual_to_show)}")
+                        except asyncio.TimeoutError:
+                            print(f"⏰ [Visual] Timeout waiting for: {visual_to_show}")
+            
             write_duration = board_event.duration_ms / 1000
             narration_duration_sec = narration_duration / 1000
             sync_duration = max(write_duration, narration_duration_sec)
             await asyncio.sleep(sync_duration)
             
-            ready_tasks = []
-            for pending in pending_image_tasks[:]:
-                if pending["task"].done():
-                    ready_tasks.append(pending)
-                    pending_image_tasks.remove(pending)
-            
-            for ready in ready_tasks:
+            pause_duration = segment.get("pause_after_ms", 500) / 1000
+            await streamer.emit_pause(int(pause_duration * 1000))
+            await asyncio.sleep(pause_duration)
+        
+        remaining_visuals = [v_id for v_id in visual_tasks.keys() if v_id not in shown_visuals]
+        if remaining_visuals:
+            print(f"📊 Showing {len(remaining_visuals)} remaining visuals...")
+            for v_id in remaining_visuals[:3]:
+                task_info = visual_tasks[v_id]
+                task = task_info["task"]
                 try:
-                    result = ready["task"].result()
+                    if not task.done():
+                        result = await asyncio.wait_for(task, timeout=20)
+                    else:
+                        result = task.result()
+                    
                     if result:
+                        visual_info = task_info["info"]
                         media = MediaReadyEvent(
-                            media_type=MediaType.IMAGE if ready["type"] == "image" else MediaType.DIAGRAM,
-                            title=f"Visual for {topic}",
-                            description=ready["prompt"][:100],
+                            media_type=get_media_type(visual_info.get("visual_type", "image")),
+                            title=visual_info.get("title", "Visual"),
+                            description=visual_info.get("detailed_prompt", "")[:100],
                             image_base64=result.get("image_base64"),
                             image_url=result.get("image_url"),
                             display_on_board=True,
@@ -201,39 +305,16 @@ async def run_streaming_lesson(run_id: str, topic: str):
                         await streamer.emit_media_ready(media)
                         await asyncio.sleep(3)
                 except Exception as e:
-                    print(f"Error processing image result: {e}")
-            
-            pause_duration = segment.get("pause_after_ms", 500) / 1000
-            await streamer.emit_pause(int(pause_duration * 1000))
-            await asyncio.sleep(pause_duration)
+                    print(f"Error displaying remaining visual {v_id}: {e}")
         
-        for pending in pending_image_tasks:
-            try:
-                result = await asyncio.wait_for(pending["task"], timeout=30)
-                if result:
-                    media = MediaReadyEvent(
-                        media_type=MediaType.IMAGE,
-                        title=f"Visual for {topic}",
-                        description=pending["prompt"][:100],
-                        image_base64=result.get("image_base64"),
-                        image_url=result.get("image_url"),
-                        display_on_board=True,
-                        display_duration_ms=5000
-                    )
-                    await streamer.emit_media_ready(media)
-                    await asyncio.sleep(2)
-            except asyncio.TimeoutError:
-                print(f"Image generation timed out for segment {pending['segment_idx']}")
-            except Exception as e:
-                print(f"Error processing remaining image: {e}")
-        
-        summary = f"Lesson on '{topic}' complete! We covered {total_segments} key concepts."
+        summary = f"Lesson on '{topic}' complete! We covered {total_segments} key concepts with {len(shown_visuals)} visual aids."
         await streamer.emit_lesson_end(summary)
         
         print(f"\n{'='*60}")
         print(f"✅ STREAMING LESSON COMPLETE!")
         print(f"📚 Topic: {topic}")
         print(f"📊 Segments delivered: {total_segments}")
+        print(f"🖼️ Visuals shown: {len(shown_visuals)}/{len(visual_plan)}")
         print(f"{'='*60}\n")
         
     except Exception as e:
