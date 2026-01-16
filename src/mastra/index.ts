@@ -127,15 +127,15 @@ export const mastra = new Mastra({
         },
       },
       {
-        path: "/assets/*",
+        path: "/ui/assets/*",
         method: "GET",
         createHandler: async ({ mastra }) => async (c) => {
           const logger = mastra?.getLogger();
           try {
             const distDir = process.env.UI_DIST_DIR || path.resolve(process.cwd(), "dist");
-            const reqPath = c.req.path;
+            const reqPath = c.req.path.replace("/ui/", "/");
             const filePath = path.join(distDir, reqPath);
-            logger?.debug("📦 [Assets] Serving:", { filePath });
+            logger?.debug("📦 [UI Assets] Serving:", { filePath });
             const content = fs.readFileSync(filePath);
             const ext = path.extname(filePath);
             const contentType = ext === ".js" ? "application/javascript" : 
@@ -144,7 +144,7 @@ export const mastra = new Mastra({
                                ext === ".svg" ? "image/svg+xml" : "application/octet-stream";
             return new Response(content, { headers: { "Content-Type": contentType } });
           } catch (e) {
-            logger?.warn("⚠️ [Assets] File not found:", { path: c.req.path });
+            logger?.warn("⚠️ [UI Assets] File not found:", { path: c.req.path });
             return c.notFound();
           }
         },
