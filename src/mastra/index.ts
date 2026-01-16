@@ -199,6 +199,86 @@ export const mastra = new Mastra({
           }
         },
       },
+      {
+        path: "/api/stream/lesson/start",
+        method: "POST",
+        createHandler: async ({ mastra }) => async (c) => {
+          const logger = mastra?.getLogger();
+          try {
+            const body = await c.req.json();
+            logger?.info("🎬 [Stream Proxy] Starting streaming lesson", body);
+            
+            const response = await fetch("http://127.0.0.1:8001/api/stream/lesson/start", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Python server error: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            logger?.info("✅ [Stream Proxy] Lesson started", data);
+            return c.json(data);
+          } catch (error: any) {
+            logger?.error("❌ [Stream Proxy] Failed to start lesson:", { error: error.message });
+            return c.json({ error: "Failed to start streaming lesson" }, 500);
+          }
+        },
+      },
+      {
+        path: "/api/stream/lesson/:runId",
+        method: "GET",
+        createHandler: async ({ mastra }) => async (c) => {
+          const logger = mastra?.getLogger();
+          const runId = c.req.param("runId");
+          
+          logger?.info("📡 [Stream Proxy] Connecting to stream", { runId });
+          
+          const pythonUrl = `http://127.0.0.1:8001/api/stream/lesson/${runId}`;
+          
+          try {
+            const response = await fetch(pythonUrl, {
+              headers: { "Accept": "text/event-stream" },
+            });
+            
+            if (!response.ok || !response.body) {
+              throw new Error(`Failed to connect to stream: ${response.status}`);
+            }
+            
+            return new Response(response.body, {
+              headers: {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+              },
+            });
+          } catch (error: any) {
+            logger?.error("❌ [Stream Proxy] Stream error:", { error: error.message, runId });
+            return c.json({ error: "Stream connection failed" }, 500);
+          }
+        },
+      },
+      {
+        path: "/api/stream/lesson/:runId",
+        method: "DELETE",
+        createHandler: async ({ mastra }) => async (c) => {
+          const logger = mastra?.getLogger();
+          const runId = c.req.param("runId");
+          
+          try {
+            await fetch(`http://127.0.0.1:8001/api/stream/lesson/${runId}`, {
+              method: "DELETE",
+            });
+            return c.json({ status: "stopped" });
+          } catch (error) {
+            logger?.error("❌ [Stream Proxy] Failed to stop stream:", { runId });
+            return c.json({ error: "Failed to stop stream" }, 500);
+          }
+        },
+      },
     ],
   },
   logger:

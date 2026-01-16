@@ -66,7 +66,10 @@ async def generate_image_async(prompt: str, topic: str) -> Optional[Dict[str, An
 
 
 async def run_streaming_lesson(run_id: str, topic: str):
-    streamer = create_streamer(run_id, topic)
+    from streaming.lesson_streamer import get_streamer
+    streamer = get_streamer(run_id)
+    if not streamer:
+        streamer = create_streamer(run_id, topic)
     
     try:
         print(f"\n{'='*60}")
