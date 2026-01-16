@@ -1,0 +1,262 @@
+"""
+Streaming Lesson Workflow
+Real-time synchronized lesson delivery with parallel content generation
+"""
+import asyncio
+import uuid
+import os
+import base64
+import httpx
+from typing import Dict, Any, Optional
+from datetime import datetime
+
+from schemas.events import (
+    EventType, MediaType, BoardWriteStyle,
+    BoardWriteEvent, NarrationSegment, MediaReadyEvent,
+    clean_text_for_board, format_formula_for_board
+)
+from streaming.lesson_streamer import LessonStreamer, create_streamer, remove_streamer
+from agents.teaching_agents import (
+    script_planner, narration_agent, board_writer, decider_agent, visual_generator
+)
+
+
+OPENAI_BASE_URL = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
+OPENAI_API_KEY = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
+
+
+async def generate_image_async(prompt: str, topic: str) -> Optional[Dict[str, Any]]:
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{OPENAI_BASE_URL}/images/generations",
+                headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "gpt-image-1",
+                    "prompt": f"Educational illustration: {prompt}. Professional, clear, informative style suitable for teaching {topic}.",
+                    "n": 1,
+                    "size": "1024x1024",
+                    "quality": "standard"
+                }
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("data") and len(data["data"]) > 0:
+                    image_data = data["data"][0]
+                    if "b64_json" in image_data:
+                        return {
+                            "image_base64": image_data["b64_json"],
+                            "prompt": prompt
+                        }
+                    elif "url" in image_data:
+                        return {
+                            "image_url": image_data["url"],
+                            "prompt": prompt
+                        }
+            else:
+                print(f"Image generation failed: {response.status_code} - {response.text}")
+                return None
+    except Exception as e:
+        print(f"Error generating image: {e}")
+        return None
+
+
+async def run_streaming_lesson(run_id: str, topic: str):
+    streamer = create_streamer(run_id, topic)
+    
+    try:
+        print(f"\n{'='*60}")
+        print(f"🎓 STREAMING LESSON - Starting")
+        print(f"📚 Topic: {topic}")
+        print(f"🆔 Run ID: {run_id}")
+        print(f"{'='*60}\n")
+        
+        await streamer.emit_status_update("Planning lesson...", 0.1)
+        
+        script = await script_planner.plan_lesson_script(topic)
+        title = script.get("title", f"📚 {topic}")
+        segments = script.get("segments", [])
+        
+        print(f"✅ Lesson plan created with {len(segments)} segments")
+        
+        await streamer.emit_lesson_start(title)
+        await asyncio.sleep(0.5)
+        
+        total_segments = len(segments)
+        board_fill = 0
+        current_content_lines = 0
+        max_board_lines = 12
+        
+        pending_image_tasks = []
+        
+        for idx, segment in enumerate(segments):
+            progress = (idx + 1) / total_segments
+            await streamer.emit_status_update(f"Teaching segment {idx + 1}/{total_segments}", progress)
+            
+            decision = await decider_agent.decide_next_action(
+                segment,
+                total_segments - idx - 1,
+                (current_content_lines / max_board_lines) * 100
+            )
+            
+            if decision.get("should_clear_board") or segment.get("clear_board") or current_content_lines >= max_board_lines:
+                await streamer.emit_board_clear("fade")
+                await asyncio.sleep(0.6)
+                current_content_lines = 0
+                board_fill = 0
+            
+            board_text = segment.get("board_text", "")
+            board_style = segment.get("board_style", "text")
+            narration_text = segment.get("narration_text", "")
+            
+            formatted_board = await board_writer.format_board_content(board_text, board_style, topic)
+            
+            if segment.get("needs_visual") and decision.get("should_generate_visual"):
+                visual_prompt = segment.get("visual_prompt", f"Educational illustration about {topic}")
+                visual_type = segment.get("visual_type", "image")
+                
+                enhanced_prompt = await visual_generator.generate_visual_prompt(visual_prompt, visual_type, topic)
+                
+                image_task = asyncio.create_task(generate_image_async(enhanced_prompt, topic))
+                pending_image_tasks.append({
+                    "task": image_task,
+                    "segment_idx": idx,
+                    "prompt": enhanced_prompt,
+                    "type": visual_type
+                })
+            
+            style_map = {
+                "title": BoardWriteStyle.TITLE,
+                "heading": BoardWriteStyle.HEADING,
+                "text": BoardWriteStyle.TEXT,
+                "formula": BoardWriteStyle.FORMULA,
+                "bullet": BoardWriteStyle.BULLET,
+                "highlight": BoardWriteStyle.HIGHLIGHT
+            }
+            
+            pacing = decision.get("pacing", "normal")
+            char_delay = {"slow": 70, "normal": 50, "fast": 30}.get(pacing, 50)
+            
+            board_event = BoardWriteEvent(
+                text=formatted_board,
+                style=style_map.get(board_style, BoardWriteStyle.TEXT),
+                color="white" if board_style != "highlight" else "yellow",
+                size="large" if board_style == "title" else "medium",
+                char_delay_ms=char_delay,
+                duration_ms=len(formatted_board) * char_delay,
+                sync_with_narration=True
+            )
+            
+            expanded_narration = await narration_agent.expand_narration(narration_text, topic, formatted_board)
+            
+            words = len(expanded_narration.split())
+            narration_duration = int((words / 150) * 60 * 1000)
+            
+            narration_segment = NarrationSegment(
+                text=expanded_narration,
+                duration_ms=narration_duration,
+                speed=1.0 if pacing == "normal" else (0.9 if pacing == "slow" else 1.1),
+                pause_after_ms=segment.get("pause_after_ms", 500)
+            )
+            
+            await asyncio.gather(
+                streamer.emit_board_write(board_event),
+                streamer.emit_narration_segment(narration_segment)
+            )
+            
+            lines_added = formatted_board.count('\n') + 1
+            current_content_lines += lines_added
+            
+            write_duration = board_event.duration_ms / 1000
+            narration_duration_sec = narration_duration / 1000
+            sync_duration = max(write_duration, narration_duration_sec)
+            await asyncio.sleep(sync_duration)
+            
+            ready_tasks = []
+            for pending in pending_image_tasks[:]:
+                if pending["task"].done():
+                    ready_tasks.append(pending)
+                    pending_image_tasks.remove(pending)
+            
+            for ready in ready_tasks:
+                try:
+                    result = ready["task"].result()
+                    if result:
+                        media = MediaReadyEvent(
+                            media_type=MediaType.IMAGE if ready["type"] == "image" else MediaType.DIAGRAM,
+                            title=f"Visual for {topic}",
+                            description=ready["prompt"][:100],
+                            image_base64=result.get("image_base64"),
+                            image_url=result.get("image_url"),
+                            display_on_board=True,
+                            display_duration_ms=5000
+                        )
+                        await streamer.emit_media_ready(media)
+                        await asyncio.sleep(3)
+                except Exception as e:
+                    print(f"Error processing image result: {e}")
+            
+            pause_duration = segment.get("pause_after_ms", 500) / 1000
+            await streamer.emit_pause(int(pause_duration * 1000))
+            await asyncio.sleep(pause_duration)
+        
+        for pending in pending_image_tasks:
+            try:
+                result = await asyncio.wait_for(pending["task"], timeout=30)
+                if result:
+                    media = MediaReadyEvent(
+                        media_type=MediaType.IMAGE,
+                        title=f"Visual for {topic}",
+                        description=pending["prompt"][:100],
+                        image_base64=result.get("image_base64"),
+                        image_url=result.get("image_url"),
+                        display_on_board=True,
+                        display_duration_ms=5000
+                    )
+                    await streamer.emit_media_ready(media)
+                    await asyncio.sleep(2)
+            except asyncio.TimeoutError:
+                print(f"Image generation timed out for segment {pending['segment_idx']}")
+            except Exception as e:
+                print(f"Error processing remaining image: {e}")
+        
+        summary = f"Lesson on '{topic}' complete! We covered {total_segments} key concepts."
+        await streamer.emit_lesson_end(summary)
+        
+        print(f"\n{'='*60}")
+        print(f"✅ STREAMING LESSON COMPLETE!")
+        print(f"📚 Topic: {topic}")
+        print(f"📊 Segments delivered: {total_segments}")
+        print(f"{'='*60}\n")
+        
+    except Exception as e:
+        print(f"❌ Error in streaming lesson: {e}")
+        import traceback
+        traceback.print_exc()
+        await streamer.emit_error(str(e))
+    finally:
+        pass
+
+
+streaming_runs: Dict[str, Dict[str, Any]] = {}
+
+
+async def start_streaming_lesson(run_id: str, topic: str):
+    streaming_runs[run_id] = {
+        "status": "RUNNING",
+        "topic": topic,
+        "started_at": datetime.now().isoformat()
+    }
+    
+    await run_streaming_lesson(run_id, topic)
+    
+    streaming_runs[run_id]["status"] = "COMPLETED"
+    streaming_runs[run_id]["completed_at"] = datetime.now().isoformat()
+
+
+def get_streaming_status(run_id: str) -> Optional[Dict[str, Any]]:
+    return streaming_runs.get(run_id)

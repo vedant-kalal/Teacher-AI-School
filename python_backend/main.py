@@ -1,6 +1,6 @@
 """
-AI Teacher - Python Backend with LangGraph
-FastAPI server that handles lesson generation using LangGraph agents
+AI Teacher - Python Backend with Streaming Support
+FastAPI server that handles real-time lesson delivery using SSE
 """
 import os
 import uuid
@@ -10,15 +10,17 @@ from typing import Optional, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from workflows.lesson_workflow import run_lesson_workflow, get_workflow_status, lesson_sessions
+from workflows.streaming_workflow import start_streaming_lesson, get_streaming_status
+from streaming.lesson_streamer import get_streamer, create_streamer, remove_streamer
 
-app = FastAPI(title="AI Teacher", description="Educational AI that generates comprehensive lessons")
+app = FastAPI(title="AI Teacher", description="Real-time Educational AI with Streaming Lessons")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,11 +41,69 @@ class LessonResponse(BaseModel):
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.now().isoformat(), "streaming": True}
+
+@app.post("/api/stream/lesson/start")
+async def start_streaming_lesson_endpoint(request: dict):
+    """Start a new streaming lesson"""
+    input_data = request.get("inputData", {})
+    topic = input_data.get("topic", "The Solar System")
+    
+    run_id = str(uuid.uuid4())
+    
+    print(f"🎓 [Streaming Lesson] Starting on: {topic}")
+    print(f"📝 Run ID: {run_id}")
+    
+    streamer = create_streamer(run_id, topic)
+    
+    asyncio.create_task(start_streaming_lesson(run_id, topic))
+    
+    return {"runId": run_id, "status": "STARTED", "streamUrl": f"/api/stream/lesson/{run_id}"}
+
+@app.get("/api/stream/lesson/{run_id}")
+async def stream_lesson_events(run_id: str):
+    """SSE endpoint for streaming lesson events"""
+    streamer = get_streamer(run_id)
+    
+    if not streamer:
+        raise HTTPException(status_code=404, detail="Lesson stream not found")
+    
+    async def event_generator():
+        try:
+            async for event in streamer.get_events():
+                yield event
+        except asyncio.CancelledError:
+            print(f"Stream cancelled for run_id: {run_id}")
+        finally:
+            pass
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+@app.get("/api/stream/lesson/{run_id}/status")
+async def get_streaming_lesson_status(run_id: str):
+    """Get status of a streaming lesson"""
+    status = get_streaming_status(run_id)
+    if not status:
+        return {"runId": run_id, "status": "NOT_FOUND"}
+    return {"runId": run_id, **status}
+
+@app.delete("/api/stream/lesson/{run_id}")
+async def stop_streaming_lesson(run_id: str):
+    """Stop a streaming lesson"""
+    remove_streamer(run_id)
+    return {"runId": run_id, "status": "STOPPED"}
 
 @app.post("/api/workflows/ai-teacher-workflow/start-async")
 async def start_lesson(request: dict):
-    """Start a new lesson generation workflow"""
+    """Start a new lesson generation workflow (legacy batch mode)"""
     input_data = request.get("inputData", {})
     topic = input_data.get("topic", "The Solar System")
     
