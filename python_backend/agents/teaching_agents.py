@@ -375,33 +375,121 @@ Return JSON:
 
 
 class NarrationAgent:
+    """
+    Enhanced speaking agent that narrates both board content AND describes visual content in sync.
+    When a visual (image/diagram/3D model) is being displayed, the agent describes it naturally.
+    """
     def __init__(self):
         pass
     
-    async def expand_narration(self, base_text: str, topic: str, context: str = "") -> str:
+    async def expand_narration(
+        self, 
+        base_text: str, 
+        topic: str, 
+        board_content: str = "",
+        visual_context: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Generate comprehensive narration that includes both board content and visual descriptions.
+        
+        Args:
+            base_text: The original narration text
+            topic: The lesson topic
+            board_content: What's currently on the blackboard
+            visual_context: Info about currently displayed visual (title, description, type)
+        """
         llm = get_llm("gpt-4o-mini", 0.8)
-        prompt = f"""Expand this narration for a teacher explaining {topic}:
+        
+        visual_section = ""
+        if visual_context:
+            visual_title = visual_context.get("title", "")
+            visual_desc = visual_context.get("description", "")
+            visual_type = visual_context.get("visual_type", "image")
+            
+            visual_section = f"""
 
-Original: "{base_text}"
-Context: {context}
+VISUAL CURRENTLY DISPLAYED:
+- Type: {visual_type}
+- Title: {visual_title}
+- Description: {visual_desc}
 
-Make it:
-- Natural speaking style (conversational)
-- 3-5 sentences
-- Engaging and clear
-- Include helpful examples
+You MUST describe this visual naturally in your narration. Point to specific elements like:
+- "As you can see in this {visual_type}..."
+- "Notice how the..." or "Looking at this diagram..."
+- "This image shows us..." or "In this visualization..."
+- Describe specific elements: "The sphere here represents...", "These arrows indicate...", "The blue area shows..."
+"""
 
-Return ONLY the expanded narration text, nothing else."""
+        prompt = f"""You are a teacher explaining {topic}. Create natural spoken narration that combines:
+
+1. THE BOARD CONTENT (what's written):
+{board_content}
+
+2. ORIGINAL NARRATION IDEA:
+{base_text}
+{visual_section}
+
+Your narration should:
+- Sound like a real teacher speaking to a class
+- Be 4-6 sentences long
+- Flow naturally between explaining the board content and the visual (if any)
+- Use conversational language ("Now, let's look at...", "You can see here that...")
+- If there's a visual, describe its specific elements in detail
+- Make connections between the board text and the visual
+- Be engaging and clear
+
+Return ONLY the narration text. No quotes, no formatting, just what the teacher would say."""
 
         try:
             response = await llm.ainvoke([
-                SystemMessage(content="You are a friendly, engaging teacher. Speak naturally."),
+                SystemMessage(content="You are a friendly, engaging teacher. Speak naturally and describe visuals in detail when present."),
+                HumanMessage(content=prompt)
+            ])
+            result = response.content.strip()
+            print(f"🎤 [Narration] Generated {len(result.split())} words" + (" (with visual)" if visual_context else ""))
+            return result
+        except Exception as e:
+            print(f"Error expanding narration: {e}")
+            return base_text
+    
+    async def describe_visual(
+        self, 
+        visual_info: Dict[str, Any], 
+        topic: str,
+        preceding_narration: str = ""
+    ) -> str:
+        """
+        Generate a focused description of a visual element.
+        Used when introducing a new visual during the lesson.
+        """
+        llm = get_llm("gpt-4o-mini", 0.7)
+        
+        visual_type = visual_info.get("visual_type", "image")
+        title = visual_info.get("title", "")
+        description = visual_info.get("detailed_prompt", visual_info.get("description", ""))
+        
+        prompt = f"""You are a teacher showing a {visual_type} to your class about {topic}.
+
+Visual Title: {title}
+Visual Description: {description}
+What you just said: {preceding_narration}
+
+Now describe this visual to your students in 2-3 sentences. Be specific about what they can see:
+- Point out key elements ("Here you can see...")
+- Explain what different parts represent
+- Connect it to what you just explained
+
+Return ONLY the visual description, nothing else."""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You describe educational visuals clearly and specifically."),
                 HumanMessage(content=prompt)
             ])
             return response.content.strip()
         except Exception as e:
-            print(f"Error expanding narration: {e}")
-            return base_text
+            print(f"Error describing visual: {e}")
+            return f"Take a look at this {visual_type} showing {title}."
 
 
 class BoardWriterAgent:

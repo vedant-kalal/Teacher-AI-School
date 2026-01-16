@@ -11,6 +11,8 @@ interface StreamingBlackboardProps {
   onStopNarration?: () => void;
 }
 
+const MAX_LINES_ON_BOARD = 12;
+
 export default function StreamingBlackboard({
   boardState,
   isNarrating,
@@ -20,6 +22,7 @@ export default function StreamingBlackboard({
 }: StreamingBlackboardProps) {
   const [animatedLines, setAnimatedLines] = useState<Map<string, string>>(new Map());
   const [clearAnimation, setClearAnimation] = useState(false);
+  const [visibleLines, setVisibleLines] = useState<BoardLine[]>([]);
   const boardContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,23 +31,63 @@ export default function StreamingBlackboard({
       const timer = setTimeout(() => {
         setClearAnimation(false);
         setAnimatedLines(new Map());
-      }, 500);
+        setVisibleLines([]);
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [boardState.isClearing]);
 
   useEffect(() => {
-    boardState.lines.forEach((line) => {
-      if (!animatedLines.has(line.id)) {
-        animateLine(line);
+    const totalLines = boardState.lines.reduce((count, line) => {
+      const lineCount = (cleanTextForBoard(line.text).match(/\n/g) || []).length + 1;
+      return count + lineCount;
+    }, 0);
+
+    if (totalLines > MAX_LINES_ON_BOARD) {
+      const linesToKeep: BoardLine[] = [];
+      let currentLineCount = 0;
+      
+      for (let i = boardState.lines.length - 1; i >= 0; i--) {
+        const line = boardState.lines[i];
+        const lineCount = (cleanTextForBoard(line.text).match(/\n/g) || []).length + 1;
+        
+        if (currentLineCount + lineCount <= MAX_LINES_ON_BOARD) {
+          linesToKeep.unshift(line);
+          currentLineCount += lineCount;
+        } else {
+          break;
+        }
       }
-    });
+      
+      if (linesToKeep.length < boardState.lines.length && !clearAnimation) {
+        setClearAnimation(true);
+        setTimeout(() => {
+          setClearAnimation(false);
+          setVisibleLines(linesToKeep);
+          const newAnimatedLines = new Map<string, string>();
+          linesToKeep.forEach(line => {
+            newAnimatedLines.set(line.id, cleanTextForBoard(line.text));
+          });
+          setAnimatedLines(newAnimatedLines);
+        }, 400);
+      } else {
+        setVisibleLines(linesToKeep);
+      }
+    } else {
+      setVisibleLines(boardState.lines);
+      
+      boardState.lines.forEach((line) => {
+        if (!animatedLines.has(line.id)) {
+          animateLine(line);
+        }
+      });
+    }
   }, [boardState.lines]);
 
   const animateLine = (line: BoardLine) => {
     const cleanText = cleanTextForBoard(line.text);
     let index = 0;
-    const charDelay = 40;
+    const charDelay = 35;
 
     const animate = () => {
       if (index <= cleanText.length) {
@@ -123,28 +166,30 @@ export default function StreamingBlackboard({
           </div>
         )}
 
-        <div className="board-lines">
-          {boardState.lines.map((line) => {
-            const displayText = animatedLines.get(line.id) || '';
-            const isComplete = displayText.length >= cleanTextForBoard(line.text).length;
+        <div className="board-text-area">
+          <div className="board-lines">
+            {visibleLines.map((line) => {
+              const displayText = animatedLines.get(line.id) || '';
+              const isComplete = displayText.length >= cleanTextForBoard(line.text).length;
 
-            return (
-              <div
-                key={line.id}
-                className={`board-line ${getStyleClasses(line.style)} handwriting`}
-                style={{ color: line.color === 'yellow' ? '#ffd700' : 'rgba(255, 255, 255, 0.95)' }}
-              >
-                {displayText.split('\n').map((textLine, idx) => (
-                  <div key={idx} className="text-line">
-                    {textLine}
-                    {idx === displayText.split('\n').length - 1 && !isComplete && (
-                      <span className="cursor">|</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
+              return (
+                <div
+                  key={line.id}
+                  className={`board-line ${getStyleClasses(line.style)} handwriting`}
+                  style={{ color: line.color === 'yellow' ? '#ffd700' : 'rgba(255, 255, 255, 0.95)' }}
+                >
+                  {displayText.split('\n').map((textLine, idx) => (
+                    <div key={idx} className="text-line">
+                      {textLine}
+                      {idx === displayText.split('\n').length - 1 && !isComplete && (
+                        <span className="cursor">|</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {boardState.currentMedia && (
@@ -192,6 +237,8 @@ export default function StreamingBlackboard({
         .streaming-blackboard-container {
           perspective: 1000px;
           width: 100%;
+          max-width: 1000px;
+          margin: 0 auto;
         }
 
         .blackboard-frame {
@@ -206,14 +253,19 @@ export default function StreamingBlackboard({
 
         .blackboard {
           background: linear-gradient(145deg, #1a472a 0%, #0d2818 40%, #153d24 70%, #1a472a 100%);
-          min-height: 500px;
+          width: 100%;
+          height: 600px;
+          min-height: 600px;
+          max-height: 600px;
           border-radius: 6px;
-          padding: 40px;
+          padding: 30px 40px;
           position: relative;
           box-shadow: 
             inset 0 0 60px rgba(0, 0, 0, 0.4),
             inset 0 0 15px rgba(0, 0, 0, 0.3);
           overflow: hidden;
+          display: flex;
+          flex-direction: column;
         }
 
         .blackboard::before {
@@ -240,6 +292,7 @@ export default function StreamingBlackboard({
           gap: 12px;
           padding: 4px 15px;
           align-items: center;
+          z-index: 10;
         }
 
         .chalk {
@@ -267,39 +320,58 @@ export default function StreamingBlackboard({
 
         .board-content {
           color: rgba(255, 255, 255, 0.95);
-          transition: opacity 0.5s ease-out;
+          transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          position: relative;
         }
 
         .board-content.clearing {
-          animation: clearBoard 0.5s ease-out forwards;
+          animation: magicalClear 0.5s ease-out forwards;
         }
 
-        @keyframes clearBoard {
-          0% { opacity: 1; transform: translateY(0); }
-          50% { opacity: 0.5; }
-          100% { opacity: 0; transform: translateY(-20px); }
+        @keyframes magicalClear {
+          0% { 
+            opacity: 1; 
+            transform: scale(1);
+            filter: blur(0);
+          }
+          50% { 
+            opacity: 0.6; 
+            transform: scale(0.98);
+            filter: blur(2px);
+          }
+          100% { 
+            opacity: 0; 
+            transform: scale(0.95) translateY(-10px);
+            filter: blur(4px);
+          }
         }
 
         .board-main-title {
-          font-size: 2.8rem;
+          font-size: 2.2rem;
           text-align: center;
-          margin-bottom: 24px;
+          margin-bottom: 16px;
           border-bottom: 3px solid rgba(255, 255, 255, 0.3);
-          padding-bottom: 16px;
+          padding-bottom: 12px;
           color: #fff;
+          flex-shrink: 0;
         }
 
         .narration-indicator {
           position: absolute;
-          top: 20px;
-          right: 20px;
+          top: 10px;
+          right: 10px;
           display: flex;
           align-items: center;
           gap: 8px;
           background: rgba(102, 126, 234, 0.3);
-          padding: 8px 16px;
+          padding: 6px 14px;
           border-radius: 20px;
           animation: pulse 1.5s infinite;
+          z-index: 5;
         }
 
         @keyframes pulse {
@@ -308,66 +380,74 @@ export default function StreamingBlackboard({
         }
 
         .speaking-icon {
-          font-size: 1.2rem;
+          font-size: 1rem;
         }
 
         .speaking-text {
-          font-size: 0.9rem;
+          font-size: 0.85rem;
           color: #fff;
+        }
+
+        .board-text-area {
+          flex: 1;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
         }
 
         .board-lines {
           display: flex;
           flex-direction: column;
-          gap: 16px;
-          margin-top: 20px;
+          gap: 10px;
+          overflow: hidden;
         }
 
         .board-line {
-          line-height: 1.6;
+          line-height: 1.5;
+          flex-shrink: 0;
         }
 
         .text-line {
-          min-height: 1.4em;
+          min-height: 1.3em;
         }
 
         .board-title-text {
-          font-size: 2.4rem;
+          font-size: 2rem;
           color: #ffd700 !important;
-          margin-bottom: 12px;
-        }
-
-        .board-heading-text {
-          font-size: 1.8rem;
-          color: #87ceeb !important;
-          margin-top: 16px;
           margin-bottom: 8px;
         }
 
+        .board-heading-text {
+          font-size: 1.5rem;
+          color: #87ceeb !important;
+          margin-top: 10px;
+          margin-bottom: 6px;
+        }
+
         .board-normal-text {
-          font-size: 1.4rem;
+          font-size: 1.25rem;
         }
 
         .board-formula-text {
-          font-size: 1.6rem;
+          font-size: 1.4rem;
           font-family: 'Times New Roman', serif;
           background: rgba(0, 0, 0, 0.2);
-          padding: 12px 20px;
+          padding: 10px 16px;
           border-radius: 8px;
           display: inline-block;
-          margin: 8px 0;
+          margin: 6px 0;
           letter-spacing: 1px;
         }
 
         .board-bullet-text {
-          font-size: 1.3rem;
-          padding-left: 20px;
+          font-size: 1.2rem;
+          padding-left: 16px;
         }
 
         .board-highlight-text {
-          font-size: 1.5rem;
+          font-size: 1.3rem;
           color: #ffd700 !important;
-          padding: 8px 16px;
+          padding: 6px 14px;
           background: rgba(255, 215, 0, 0.1);
           border-left: 4px solid #ffd700;
           border-radius: 4px;
@@ -385,41 +465,46 @@ export default function StreamingBlackboard({
         }
 
         .board-media-container {
-          margin-top: 30px;
-          text-align: center;
+          position: absolute;
+          right: 20px;
+          top: 80px;
+          max-width: 280px;
           animation: fadeInMedia 0.6s ease-out;
+          z-index: 3;
         }
 
         @keyframes fadeInMedia {
           from { 
             opacity: 0; 
-            transform: scale(0.9) translateY(20px); 
+            transform: scale(0.9) translateX(20px); 
           }
           to { 
             opacity: 1; 
-            transform: scale(1) translateY(0); 
+            transform: scale(1) translateX(0); 
           }
         }
 
         .media-frame {
           display: inline-block;
           background: rgba(255, 255, 255, 0.1);
-          padding: 16px;
+          padding: 12px;
           border-radius: 12px;
           border: 2px solid rgba(255, 255, 255, 0.2);
+          backdrop-filter: blur(4px);
         }
 
         .board-media-image {
           max-width: 100%;
-          max-height: 350px;
+          max-height: 220px;
           border-radius: 8px;
           box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
         }
 
         .media-caption {
-          margin-top: 12px;
-          font-size: 1.2rem;
+          margin-top: 10px;
+          font-size: 1rem;
           color: #ffd700;
+          text-align: center;
         }
 
         .idle-message, .loading-message, .error-message {
@@ -427,13 +512,13 @@ export default function StreamingBlackboard({
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          min-height: 400px;
+          height: 100%;
           text-align: center;
           color: rgba(255, 255, 255, 0.9);
         }
 
         .idle-message p, .error-message p {
-          font-size: 2rem;
+          font-size: 1.8rem;
           margin: 10px 0;
         }
 
@@ -442,7 +527,7 @@ export default function StreamingBlackboard({
         }
 
         .chalk-animation span {
-          font-size: 2rem;
+          font-size: 1.8rem;
           color: #fff;
         }
 
@@ -468,16 +553,16 @@ export default function StreamingBlackboard({
         }
 
         .lesson-complete {
-          margin-top: 40px;
+          margin-top: auto;
           text-align: center;
-          padding: 20px;
+          padding: 16px;
           background: rgba(76, 175, 80, 0.2);
           border-radius: 12px;
           border: 2px solid rgba(76, 175, 80, 0.4);
         }
 
         .lesson-complete p {
-          font-size: 1.8rem;
+          font-size: 1.5rem;
           color: #81c784;
           margin: 0;
         }

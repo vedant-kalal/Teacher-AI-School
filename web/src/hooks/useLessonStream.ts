@@ -135,20 +135,6 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
         }));
         break;
 
-      case EventType.BOARD_CLEAR:
-        setBoardState((prev) => ({ ...prev, isClearing: true }));
-        options.onBoardClear?.();
-        
-        setTimeout(() => {
-          setBoardState((prev) => ({
-            ...prev,
-            lines: [],
-            isClearing: false,
-          }));
-          setDisplayedText('');
-        }, data.duration_ms || 500);
-        break;
-
       case EventType.BOARD_WRITE: {
         const writeEvent: BoardWriteEvent = {
           text: data.text,
@@ -175,6 +161,7 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
         setBoardState((prev) => ({
           ...prev,
           lines: [...prev.lines, newLine],
+          currentMedia: null,
         }));
 
         animateText(writeEvent.text, writeEvent.char_delay_ms, () => {
@@ -218,13 +205,24 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
 
         if (media.display_on_board) {
           setBoardState((prev) => ({ ...prev, currentMedia: media }));
-          
-          setTimeout(() => {
-            setBoardState((prev) => ({ ...prev, currentMedia: null }));
-          }, media.display_duration_ms);
         }
 
         options.onMediaReady?.(media);
+        break;
+      }
+
+      case EventType.BOARD_CLEAR: {
+        setBoardState((prev) => ({ ...prev, isClearing: true, currentMedia: null }));
+        options.onBoardClear?.();
+        
+        setTimeout(() => {
+          setBoardState((prev) => ({
+            ...prev,
+            lines: [],
+            isClearing: false,
+          }));
+          setDisplayedText('');
+        }, data.duration_ms || 500);
         break;
       }
 

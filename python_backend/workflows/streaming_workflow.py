@@ -198,7 +198,64 @@ async def run_streaming_lesson(run_id: str, topic: str):
                 sync_with_narration=True
             )
             
-            expanded_narration = await narration_agent.expand_narration(narration_text, topic, formatted_board)
+            coordination = await visual_coordinator.coordinate_visuals(
+                visual_plan,
+                segment_id,
+                narration_text,
+                total_segments - idx - 1,
+                shown_visuals
+            )
+            
+            visual_context = None
+            visual_to_display = None
+            
+            if coordination.get("show_visual"):
+                print(f"🎯 [Coordinator] Decision: Show '{coordination.get('visual_to_show')}' - {coordination.get('reason', 'N/A')}")
+                visual_to_show = coordination.get("visual_to_show")
+                
+                if visual_to_show and visual_to_show in visual_tasks:
+                    task_info = visual_tasks[visual_to_show]
+                    task = task_info["task"]
+                    visual_info = task_info["info"]
+                    
+                    if task.done():
+                        result = task.result()
+                        if result:
+                            visual_to_display = {
+                                "info": visual_info,
+                                "result": result,
+                                "duration": coordination.get("display_duration_ms", 5000)
+                            }
+                            visual_context = {
+                                "title": visual_info.get("title", ""),
+                                "description": visual_info.get("detailed_prompt", ""),
+                                "visual_type": visual_info.get("visual_type", "image")
+                            }
+                            shown_visuals.append(visual_to_show)
+                    else:
+                        try:
+                            result = await asyncio.wait_for(task, timeout=15)
+                            if result:
+                                visual_to_display = {
+                                    "info": visual_info,
+                                    "result": result,
+                                    "duration": coordination.get("display_duration_ms", 5000)
+                                }
+                                visual_context = {
+                                    "title": visual_info.get("title", ""),
+                                    "description": visual_info.get("detailed_prompt", ""),
+                                    "visual_type": visual_info.get("visual_type", "image")
+                                }
+                                shown_visuals.append(visual_to_show)
+                        except asyncio.TimeoutError:
+                            print(f"⏰ [Visual] Timeout waiting for: {visual_to_show}")
+            
+            expanded_narration = await narration_agent.expand_narration(
+                narration_text, 
+                topic, 
+                formatted_board,
+                visual_context
+            )
             
             words = len(expanded_narration.split())
             narration_duration = int((words / 150) * 60 * 1000)
@@ -210,65 +267,27 @@ async def run_streaming_lesson(run_id: str, topic: str):
                 pause_after_ms=segment.get("pause_after_ms", 500)
             )
             
-            await asyncio.gather(
-                streamer.emit_board_write(board_event),
-                streamer.emit_narration_segment(narration_segment)
-            )
+            await streamer.emit_board_write(board_event)
+            
+            if visual_to_display:
+                visual_info = visual_to_display["info"]
+                result = visual_to_display["result"]
+                media = MediaReadyEvent(
+                    media_type=get_media_type(visual_info.get("visual_type", "image")),
+                    title=visual_info.get("title", "Visual"),
+                    description=visual_info.get("detailed_prompt", "")[:100],
+                    image_base64=result.get("image_base64"),
+                    image_url=result.get("image_url"),
+                    display_on_board=True,
+                    display_duration_ms=visual_to_display["duration"]
+                )
+                await streamer.emit_media_ready(media)
+                print(f"📸 [Visual] Displayed: {visual_info.get('title', 'Visual')}")
+            
+            await streamer.emit_narration_segment(narration_segment)
             
             lines_added = formatted_board.count('\n') + 1
             current_content_lines += lines_added
-            
-            coordination = await visual_coordinator.coordinate_visuals(
-                visual_plan,
-                segment_id,
-                expanded_narration,
-                total_segments - idx - 1,
-                shown_visuals
-            )
-            
-            if coordination.get("show_visual"):
-                print(f"🎯 [Coordinator] Decision: Show '{coordination.get('visual_to_show')}' - {coordination.get('reason', 'N/A')}")
-                visual_to_show = coordination.get("visual_to_show")
-                
-                if visual_to_show and visual_to_show in visual_tasks:
-                    task_info = visual_tasks[visual_to_show]
-                    task = task_info["task"]
-                    
-                    if task.done():
-                        result = task.result()
-                        if result:
-                            visual_info = task_info["info"]
-                            media = MediaReadyEvent(
-                                media_type=get_media_type(visual_info.get("visual_type", "image")),
-                                title=visual_info.get("title", "Visual"),
-                                description=visual_info.get("detailed_prompt", "")[:100],
-                                image_base64=result.get("image_base64"),
-                                image_url=result.get("image_url"),
-                                display_on_board=True,
-                                display_duration_ms=coordination.get("display_duration_ms", 5000)
-                            )
-                            await streamer.emit_media_ready(media)
-                            shown_visuals.append(visual_to_show)
-                            print(f"📸 [Visual] Displayed: {visual_info.get('title', visual_to_show)}")
-                    else:
-                        try:
-                            result = await asyncio.wait_for(task, timeout=15)
-                            if result:
-                                visual_info = task_info["info"]
-                                media = MediaReadyEvent(
-                                    media_type=get_media_type(visual_info.get("visual_type", "image")),
-                                    title=visual_info.get("title", "Visual"),
-                                    description=visual_info.get("detailed_prompt", "")[:100],
-                                    image_base64=result.get("image_base64"),
-                                    image_url=result.get("image_url"),
-                                    display_on_board=True,
-                                    display_duration_ms=coordination.get("display_duration_ms", 5000)
-                                )
-                                await streamer.emit_media_ready(media)
-                                shown_visuals.append(visual_to_show)
-                                print(f"📸 [Visual] Displayed (waited): {visual_info.get('title', visual_to_show)}")
-                        except asyncio.TimeoutError:
-                            print(f"⏰ [Visual] Timeout waiting for: {visual_to_show}")
             
             write_duration = board_event.duration_ms / 1000
             narration_duration_sec = narration_duration / 1000
