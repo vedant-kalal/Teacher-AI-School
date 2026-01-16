@@ -91,18 +91,22 @@ export default function App() {
         const data = await res.json();
         const result = data.result;
 
-        if (result) {
+        if (data.status === 'COMPLETED' && result) {
           clearInterval(pollInterval);
+          
+          const boardContentData = Array.isArray(result.boardContent) 
+            ? result.boardContent[0] 
+            : result.boardContent;
           
           setLesson(prev => ({
             ...prev,
             status: 'completed',
             currentStep: 'Lesson Complete!',
-            boardContent: result.boardContent?.[0] || null,
-            diagrams: result.diagrams || [],
-            images: result.images || [],
-            simulations: result.simulations || [],
-            videos: result.videos || [],
+            boardContent: boardContentData || null,
+            diagrams: Array.isArray(result.diagrams) ? result.diagrams : [],
+            images: Array.isArray(result.images) ? result.images : [],
+            simulations: Array.isArray(result.simulations) ? result.simulations : [],
+            videos: Array.isArray(result.videos) ? result.videos : [],
             lessonPlan: result.lessonPlan || null,
             qualityReview: result.qualityReview || null,
           }));
@@ -110,10 +114,11 @@ export default function App() {
           const steps = data.steps || [];
           const currentStepInfo = steps.find((s: any) => s.status === 'running');
           const completedSteps = steps.filter((s: any) => s.status === 'completed');
+          const stepName = currentStepInfo?.name || currentStepInfo?.stepId || `Step ${completedSteps.length + 1}`;
           
           setLesson(prev => ({
             ...prev,
-            currentStep: currentStepInfo?.stepId || `Step ${completedSteps.length + 1}`,
+            currentStep: stepName,
             artifacts: steps.map((s: any) => ({
               step: s.stepId,
               status: s.status,

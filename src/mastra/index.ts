@@ -15,8 +15,17 @@ import { loadLessonData } from "./tools/utils/lessonStorage";
 import { registerCronTrigger } from "../triggers/cronTriggers";
 import { aiTeacherAgent } from "./agents/aiTeacherAgent";
 import { aiTeacherWorkflow } from "./workflows/aiTeacherWorkflow";
+import { waitForPythonServer, proxyStartWorkflow, proxyGetWorkflowStatus } from "../pythonBridge";
 
 const workflowRuns = new Map<string, { status: string; result?: any; sessionId?: string }>();
+
+waitForPythonServer(10000).then(ready => {
+  if (ready) {
+    console.log("✅ Python server is ready");
+  } else {
+    console.log("⚠️ Python server not detected yet - will retry on first request");
+  }
+});
 
 registerCronTrigger({
   cronExpression: process.env.SCHEDULE_CRON_EXPRESSION || "0 9 * * *",
@@ -121,26 +130,15 @@ export const mastra = new Mastra({
             const body = await c.req.json();
             const topic = body?.inputData?.topic || "The Human Circulatory System";
             
-            logger?.info("🎓 [UI Trigger] Starting lesson on:", { topic });
+            logger?.info("🎓 [UI Trigger] Starting Python lesson on:", { topic });
             
-            const run = await aiTeacherWorkflow.createRunAsync();
-            const runId = run?.runId || `run_${Date.now()}`;
+            const result = await proxyStartWorkflow(topic);
             
-            workflowRuns.set(runId, { status: "RUNNING", sessionId: undefined });
+            logger?.info("✅ [UI Trigger] Python workflow started", { runId: result.runId, topic });
             
-            await inngest.send({
-              name: `workflow.ai-teacher-workflow`,
-              data: {
-                runId,
-                inputData: { topic },
-              },
-            });
-            
-            logger?.info("✅ [UI Trigger] Workflow started", { runId, topic });
-            
-            return c.json({ runId, status: "RUNNING" });
+            return c.json(result);
           } catch (error) {
-            logger?.error("❌ [UI Trigger] Failed to start workflow:", { error });
+            logger?.error("❌ [UI Trigger] Failed to start Python workflow:", { error });
             return c.json({ error: "Failed to start workflow" }, 500);
           }
         },
@@ -153,34 +151,10 @@ export const mastra = new Mastra({
           const runId = c.req.param("runId");
           
           try {
-            const runInfo = workflowRuns.get(runId);
-            
-            if (!runInfo) {
-              return c.json({ 
-                runId, 
-                status: "RUNNING",
-                steps: [] 
-              });
-            }
-            
-            if (runInfo.sessionId) {
-              const lessonData = loadLessonData(runInfo.sessionId);
-              if (lessonData && lessonData.fullNarration) {
-                return c.json({
-                  runId,
-                  status: "COMPLETED",
-                  result: lessonData,
-                });
-              }
-            }
-            
-            return c.json({
-              runId,
-              status: runInfo.status,
-              result: runInfo.result,
-            });
+            const result = await proxyGetWorkflowStatus(runId);
+            return c.json(result);
           } catch (error) {
-            logger?.error("❌ [UI] Failed to get workflow status:", { error, runId });
+            logger?.error("❌ [UI] Failed to get Python workflow status:", { error, runId });
             return c.json({ error: "Failed to get workflow status" }, 500);
           }
         },

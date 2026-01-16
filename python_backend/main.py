@@ -74,16 +74,24 @@ async def get_lesson_content(session_id: str):
     
     return lesson_sessions[session_id]
 
-app.mount("/assets", StaticFiles(directory="dist/assets"), name="assets")
+import pathlib
+BASE_DIR = pathlib.Path(__file__).parent.parent
+
+try:
+    app.mount("/assets", StaticFiles(directory=str(BASE_DIR / "dist" / "assets")), name="assets")
+except RuntimeError:
+    print("Warning: dist/assets not found, UI will not be served")
 
 @app.get("/ui")
 async def serve_ui():
-    return FileResponse("dist/index.html")
+    return FileResponse(str(BASE_DIR / "dist" / "index.html"))
 
 @app.get("/ui/{path:path}")
 async def serve_ui_paths(path: str):
-    return FileResponse("dist/index.html")
+    return FileResponse(str(BASE_DIR / "dist" / "index.html"))
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PYTHON_SERVER_PORT", "8001"))
+    print(f"🐍 Python AI Teacher starting on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)

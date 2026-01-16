@@ -42,12 +42,14 @@ export default function Blackboard({ content, lessonPlan, status, topic }: Black
       );
     }
 
-    if (content?.boardContent) {
-      const { title, sections } = content.boardContent;
+    if (content) {
+      const title = content.title || content.boardContent?.title || topic;
+      const sections = content.sections || content.boardContent?.sections || [];
+      
       return (
         <div className="board-content">
           {title && <h2 className="board-title handwriting">{title}</h2>}
-          {sections?.map((section: any, idx: number) => (
+          {sections.length > 0 ? sections.map((section: any, idx: number) => (
             <div 
               key={idx} 
               className={`board-section section-${section.type} handwriting`}
@@ -58,7 +60,7 @@ export default function Blackboard({ content, lessonPlan, status, topic }: Black
                 fontWeight: section.style?.emphasis ? 'bold' : 'normal',
               }}
             >
-              {section.type === 'bullet_points' ? (
+              {section.type === 'bullet_points' && typeof section.content === 'string' ? (
                 <ul>
                   {section.content.split('\n').map((item: string, i: number) => (
                     <li key={i}>{item.replace(/^[-*]\s*/, '')}</li>
@@ -66,13 +68,17 @@ export default function Blackboard({ content, lessonPlan, status, topic }: Black
                 </ul>
               ) : section.type === 'formula' ? (
                 <div className="formula">{section.content}</div>
-              ) : section.type === 'heading' ? (
+              ) : section.type === 'heading' || section.type === 'header' ? (
                 <h3 className="section-heading">{section.content}</h3>
               ) : (
                 <p>{section.content}</p>
               )}
             </div>
-          ))}
+          )) : (
+            <p className="handwriting" style={{ fontSize: '1.3rem', lineHeight: '1.8' }}>
+              {content.chalk_color && '✏️ '}{typeof content === 'string' ? content : 'Lesson content loaded!'}
+            </p>
+          )}
         </div>
       );
     }
