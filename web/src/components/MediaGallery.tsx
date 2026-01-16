@@ -32,16 +32,20 @@ export default function MediaGallery({ diagrams, images, simulations, videos }: 
           />
         )}
         
-        {data.elements?.length > 0 && (
+        {data.elements && (
           <div className="elements-list">
             <h5>Elements:</h5>
-            <ul>
-              {data.elements.map((el: any, i: number) => (
-                <li key={i}>
-                  <strong>{el.label}</strong>: {el.description}
-                </li>
-              ))}
-            </ul>
+            {typeof data.elements === 'string' ? (
+              <p className="elements-text">{data.elements}</p>
+            ) : Array.isArray(data.elements) && data.elements.length > 0 ? (
+              <ul>
+                {data.elements.map((el: any, i: number) => (
+                  <li key={i}>
+                    <strong>{el.label}</strong>: {el.description}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         )}
 
@@ -104,17 +108,36 @@ export default function MediaGallery({ diagrams, images, simulations, videos }: 
           />
         )}
 
-        {data.scene?.objects?.length > 0 && (
+        {(data.scene?.objects || data.objects) && (
           <div className="elements-list">
             <h5>3D Objects:</h5>
-            <ul>
-              {data.scene.objects.map((obj: any, i: number) => (
-                <li key={i}>
-                  <strong>{obj.name}</strong> ({obj.type})
-                  {obj.interactive && <span className="badge">Interactive</span>}
-                </li>
-              ))}
-            </ul>
+            {typeof (data.scene?.objects || data.objects) === 'string' ? (
+              <p className="elements-text">{data.scene?.objects || data.objects}</p>
+            ) : Array.isArray(data.scene?.objects) && data.scene.objects.length > 0 ? (
+              <ul>
+                {data.scene.objects.map((obj: any, i: number) => (
+                  <li key={i}>
+                    <strong>{obj.name}</strong> ({obj.type})
+                    {obj.interactive && <span className="badge">Interactive</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        )}
+        
+        {data.interactions && (
+          <div className="elements-list">
+            <h5>Interactions:</h5>
+            {typeof data.interactions === 'string' ? (
+              <p className="elements-text">{data.interactions}</p>
+            ) : Array.isArray(data.interactions) ? (
+              <ul>
+                {data.interactions.map((int: string, i: number) => (
+                  <li key={i}>{int}</li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         )}
 
@@ -142,17 +165,21 @@ export default function MediaGallery({ diagrams, images, simulations, videos }: 
           />
         )}
 
-        {storyboard.scenes?.length > 0 && (
+        {storyboard.scenes && (
           <div className="elements-list">
             <h5>Scenes:</h5>
-            <ol>
-              {storyboard.scenes.map((scene: any, i: number) => (
-                <li key={i}>
-                  <strong>{scene.duration}</strong>: {scene.visualDescription}
-                  <p className="scene-narration">"{scene.narration}"</p>
-                </li>
-              ))}
-            </ol>
+            {typeof storyboard.scenes === 'string' ? (
+              <p className="elements-text">{storyboard.scenes}</p>
+            ) : Array.isArray(storyboard.scenes) && storyboard.scenes.length > 0 ? (
+              <ol>
+                {storyboard.scenes.map((scene: any, i: number) => (
+                  <li key={i}>
+                    <strong>{scene.duration}</strong>: {scene.visualDescription}
+                    <p className="scene-narration">"{scene.narration}"</p>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
           </div>
         )}
 
