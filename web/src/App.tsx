@@ -30,15 +30,14 @@ export default function App() {
   return (
     <div className="app">
       <div className="top-bar">
-        <h1>🎓 AI Teacher</h1>
-        <div className="controls">
-          <TopicInput 
-            onSubmit={handleStartLesson} 
-            disabled={lessonState.status === 'running' || lessonState.status === 'starting'} 
-            onReset={handleReset}
-            showReset={lessonState.status !== 'idle'}
-          />
-        </div>
+        <span className="logo">🎓 AI Teacher</span>
+        <TopicInput 
+          onSubmit={handleStartLesson} 
+          disabled={lessonState.status === 'running' || lessonState.status === 'starting'} 
+          onReset={handleReset}
+          showReset={lessonState.status !== 'idle'}
+        />
+        {isNarrating && <span className="speaking-indicator">🔊</span>}
       </div>
 
       <main className="board-area">
@@ -50,13 +49,6 @@ export default function App() {
           title={lessonState.title}
         />
       </main>
-
-      {isNarrating && (
-        <div className="narration-bar">
-          <span className="narration-icon">🔊</span>
-          <span>Teacher is speaking...</span>
-        </div>
-      )}
 
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -72,62 +64,46 @@ export default function App() {
           width: 100vw;
           display: flex;
           flex-direction: column;
-          background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-          padding: 10px 15px;
+          background: #0f0f1a;
           overflow: hidden;
         }
 
         .top-bar {
           display: flex;
           align-items: center;
-          gap: 20px;
+          gap: 15px;
+          padding: 8px 12px;
+          background: rgba(30, 30, 50, 0.95);
+          border-bottom: 1px solid rgba(100, 100, 150, 0.3);
           flex-shrink: 0;
-          padding-bottom: 10px;
         }
 
-        .top-bar h1 {
-          font-size: 1.5rem;
+        .logo {
+          font-size: 1.2rem;
           font-weight: 700;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+          background: linear-gradient(135deg, #667eea, #764ba2, #f093fb);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
           white-space: nowrap;
         }
 
-        .controls {
-          flex: 1;
+        .speaking-indicator {
+          font-size: 1.2rem;
+          animation: pulse 1.5s infinite;
+          margin-left: auto;
+        }
+
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.2); opacity: 0.7; }
         }
 
         .board-area {
           flex: 1;
           min-height: 0;
           overflow: hidden;
-        }
-
-        .narration-bar {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          padding: 8px 16px;
-          background: rgba(102, 126, 234, 0.15);
-          border-radius: 8px;
-          border: 1px solid rgba(102, 126, 234, 0.3);
-          margin-top: 8px;
-          flex-shrink: 0;
-          color: #fff;
-          font-size: 0.95rem;
-        }
-
-        .narration-icon {
-          font-size: 1.2rem;
-          animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.15); }
+          padding: 0;
         }
       `}</style>
     </div>

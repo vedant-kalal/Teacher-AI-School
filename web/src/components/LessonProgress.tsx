@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 interface LessonProgressProps {
   status: 'idle' | 'running' | 'completed' | 'error';
@@ -6,7 +6,7 @@ interface LessonProgressProps {
   topic: string;
 }
 
-export default function LessonProgress({ status, currentStep, topic }: LessonProgressProps) {
+export default function LessonProgress({ status, currentStep }: LessonProgressProps) {
   const getStatusColor = () => {
     switch (status) {
       case 'running': return '#667eea';

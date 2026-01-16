@@ -7,11 +7,9 @@ interface StreamingBlackboardProps {
   lessonStatus: 'idle' | 'starting' | 'running' | 'paused' | 'completed' | 'error';
   topic: string;
   title: string;
-  onStartNarration?: () => void;
-  onStopNarration?: () => void;
 }
 
-const MAX_VISIBLE_LINES = 12;
+const LINES_PER_PAGE = 10;
 
 export default function StreamingBlackboard({
   boardState,
@@ -22,7 +20,13 @@ export default function StreamingBlackboard({
 }: StreamingBlackboardProps) {
   const [animatedLines, setAnimatedLines] = useState<Map<string, string>>(new Map());
   const [clearAnimation, setClearAnimation] = useState(false);
-  const [displayedLines, setDisplayedLines] = useState<BoardLine[]>([]);
+  const [currentPage, setCurrentPage] = useState(0);
+
+  const totalPages = Math.max(1, Math.ceil(boardState.lines.length / LINES_PER_PAGE));
+  
+  useEffect(() => {
+    setCurrentPage(totalPages - 1);
+  }, [boardState.lines.length]);
 
   useEffect(() => {
     if (boardState.isClearing) {
@@ -30,17 +34,14 @@ export default function StreamingBlackboard({
       const timer = setTimeout(() => {
         setClearAnimation(false);
         setAnimatedLines(new Map());
-        setDisplayedLines([]);
+        setCurrentPage(0);
       }, 600);
       return () => clearTimeout(timer);
     }
   }, [boardState.isClearing]);
 
   useEffect(() => {
-    const lines = boardState.lines.slice(-MAX_VISIBLE_LINES);
-    setDisplayedLines(lines);
-    
-    lines.forEach((line) => {
+    boardState.lines.forEach((line) => {
       if (!animatedLines.has(line.id)) {
         animateLine(line);
       }
@@ -50,7 +51,7 @@ export default function StreamingBlackboard({
   const animateLine = (line: BoardLine) => {
     const cleanText = cleanTextForBoard(line.text);
     let index = 0;
-    const charDelay = 30;
+    const charDelay = 25;
 
     const animate = () => {
       if (index <= cleanText.length) {
@@ -61,98 +62,82 @@ export default function StreamingBlackboard({
         }
       }
     };
-
     animate();
   };
 
   const getStyleClasses = (style: BoardWriteStyle): string => {
     switch (style) {
-      case BoardWriteStyle.TITLE:
-        return 'board-title-text';
-      case BoardWriteStyle.HEADING:
-        return 'board-heading-text';
-      case BoardWriteStyle.FORMULA:
-        return 'board-formula-text';
-      case BoardWriteStyle.BULLET:
-        return 'board-bullet-text';
-      case BoardWriteStyle.HIGHLIGHT:
-        return 'board-highlight-text';
-      default:
-        return 'board-normal-text';
+      case BoardWriteStyle.TITLE: return 'line-title';
+      case BoardWriteStyle.HEADING: return 'line-heading';
+      case BoardWriteStyle.FORMULA: return 'line-formula';
+      case BoardWriteStyle.BULLET: return 'line-bullet';
+      case BoardWriteStyle.HIGHLIGHT: return 'line-highlight';
+      default: return 'line-normal';
     }
   };
 
+  const startIdx = currentPage * LINES_PER_PAGE;
+  const endIdx = startIdx + LINES_PER_PAGE;
+  const visibleLines = boardState.lines.slice(startIdx, endIdx);
+
+  const goToPrevPage = () => setCurrentPage(p => Math.max(0, p - 1));
+  const goToNextPage = () => setCurrentPage(p => Math.min(totalPages - 1, p + 1));
+
   return (
-    <div className="blackboard-wrapper">
-      <div className="blackboard-frame">
-        <div className="blackboard">
-          <div className="chalk-tray">
-            <div className="chalk white"></div>
-            <div className="chalk yellow"></div>
-            <div className="chalk blue"></div>
-          </div>
-          
+    <div className="board-container">
+      <div className="board-frame">
+        <div className="board">
           {lessonStatus === 'idle' && (
-            <div className="center-message handwriting">
+            <div className="center-msg chalk-font">
               <p>📚 Welcome to AI Teacher!</p>
               <p>Enter a topic above to begin.</p>
             </div>
           )}
 
           {lessonStatus === 'starting' && (
-            <div className="center-message">
-              <span className="handwriting">🎓 Preparing lesson on {topic}...</span>
-              <div className="loading-dots">
-                <span></span><span></span><span></span>
-              </div>
+            <div className="center-msg chalk-font">
+              <span>🎓 Preparing lesson on {topic}...</span>
+              <div className="dots"><span></span><span></span><span></span></div>
             </div>
           )}
 
           {lessonStatus === 'error' && (
-            <div className="center-message handwriting error">
-              <p>❌ Something went wrong.</p>
-              <p>Please try again.</p>
+            <div className="center-msg chalk-font error">
+              <p>❌ Something went wrong. Please try again.</p>
             </div>
           )}
 
           {(lessonStatus === 'running' || lessonStatus === 'completed' || lessonStatus === 'paused') && (
-            <div className={`board-content ${clearAnimation ? 'clearing' : ''}`}>
-              {isNarrating && (
-                <div className="speaking-badge">
-                  <span>🔊 Speaking...</span>
-                </div>
-              )}
+            <div className={`content ${clearAnimation ? 'clearing' : ''}`}>
+              {isNarrating && <div className="speaking">🔊 Speaking...</div>}
+              
+              {title && <div className="main-title chalk-font">{title}</div>}
 
-              {title && (
-                <div className="board-title handwriting">{title}</div>
-              )}
-
-              <div className="board-body">
-                <div className="text-column">
-                  {displayedLines.map((line) => {
+              <div className="layout">
+                <div className="text-side">
+                  {visibleLines.map((line) => {
                     const displayText = animatedLines.get(line.id) || '';
                     const isComplete = displayText.length >= cleanTextForBoard(line.text).length;
-
                     return (
                       <div
                         key={line.id}
-                        className={`board-line ${getStyleClasses(line.style)} handwriting`}
+                        className={`line ${getStyleClasses(line.style)} chalk-font`}
                         style={{ color: line.color === 'yellow' ? '#ffd700' : '#fff' }}
                       >
                         {displayText}
-                        {!isComplete && <span className="cursor">|</span>}
+                        {!isComplete && <span className="caret">|</span>}
                       </div>
                     );
                   })}
 
-                  {lessonStatus === 'completed' && (
-                    <div className="complete-badge handwriting">✅ Lesson Complete!</div>
+                  {lessonStatus === 'completed' && currentPage === totalPages - 1 && (
+                    <div className="done chalk-font">✅ Lesson Complete!</div>
                   )}
                 </div>
 
-                {boardState.currentMedia && (boardState.currentMedia.image_base64 || boardState.currentMedia.image_url) && (
-                  <div className="image-column">
-                    <div className="media-box">
+                <div className="image-side">
+                  {boardState.currentMedia && (boardState.currentMedia.image_base64 || boardState.currentMedia.image_url) && (
+                    <div className="img-box">
                       <img
                         src={
                           boardState.currentMedia.image_base64
@@ -161,113 +146,117 @@ export default function StreamingBlackboard({
                         }
                         alt={boardState.currentMedia.title}
                       />
-                      <div className="media-label handwriting">{boardState.currentMedia.title}</div>
+                      <div className="img-label chalk-font">{boardState.currentMedia.title}</div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
+
+              {totalPages > 1 && (
+                <div className="pagination">
+                  <button onClick={goToPrevPage} disabled={currentPage === 0}>← Prev</button>
+                  <span className="page-info">Page {currentPage + 1} / {totalPages}</span>
+                  <button onClick={goToNextPage} disabled={currentPage === totalPages - 1}>Next →</button>
+                </div>
+              )}
             </div>
           )}
+
+          <div className="tray">
+            <div className="chalk-piece white"></div>
+            <div className="chalk-piece yellow"></div>
+            <div className="chalk-piece blue"></div>
+          </div>
         </div>
       </div>
 
       <style>{`
-        .blackboard-wrapper {
+        .board-container {
           width: 100%;
           height: 100%;
         }
 
-        .blackboard-frame {
-          background: linear-gradient(135deg, #5c4033 0%, #4a3228 50%, #5c4033 100%);
-          padding: 18px;
-          border-radius: 12px;
-          box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+        .board-frame {
+          background: linear-gradient(135deg, #5c4033, #4a3228, #5c4033);
+          padding: 12px;
+          border-radius: 8px;
           height: 100%;
           width: 100%;
         }
 
-        .blackboard {
-          background: linear-gradient(145deg, #1a472a 0%, #0d2818 40%, #153d24 70%, #1a472a 100%);
+        .board {
+          background: linear-gradient(145deg, #1a472a, #0d2818, #153d24, #1a472a);
           width: 100%;
           height: 100%;
-          border-radius: 6px;
-          padding: 20px 30px 30px 30px;
+          border-radius: 4px;
+          padding: 15px 20px 25px 20px;
           position: relative;
-          box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.4);
-          overflow: hidden;
+          box-shadow: inset 0 0 40px rgba(0,0,0,0.4);
           display: flex;
           flex-direction: column;
+          overflow: hidden;
         }
 
-        .blackboard::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-          opacity: 0.04;
-          pointer-events: none;
-        }
-
-        .chalk-tray {
+        .tray {
           position: absolute;
           bottom: 0;
-          left: 30px;
-          right: 30px;
-          height: 16px;
+          left: 20px;
+          right: 20px;
+          height: 12px;
           background: linear-gradient(to bottom, #6b5344, #5c4033);
-          border-radius: 3px 3px 0 0;
+          border-radius: 2px 2px 0 0;
           display: flex;
-          gap: 12px;
-          padding: 3px 15px;
+          gap: 8px;
+          padding: 2px 10px;
           align-items: center;
         }
 
-        .chalk {
-          width: 35px;
-          height: 8px;
+        .chalk-piece {
+          width: 30px;
+          height: 6px;
           border-radius: 2px;
         }
-        .chalk.white { background: linear-gradient(to bottom, #fff, #e0e0e0); }
-        .chalk.yellow { background: linear-gradient(to bottom, #ffd700, #daa520); }
-        .chalk.blue { background: linear-gradient(to bottom, #87ceeb, #6bb3d9); }
+        .chalk-piece.white { background: linear-gradient(#fff, #e0e0e0); }
+        .chalk-piece.yellow { background: linear-gradient(#ffd700, #daa520); }
+        .chalk-piece.blue { background: linear-gradient(#87ceeb, #6bb3d9); }
 
-        .handwriting {
+        .chalk-font {
           font-family: 'Caveat', 'Segoe Script', cursive;
-          text-shadow: 0 0 4px rgba(255, 255, 255, 0.2);
+          text-shadow: 0 0 3px rgba(255,255,255,0.2);
         }
 
-        .center-message {
+        .center-msg {
+          flex: 1;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          flex: 1;
           color: #fff;
-          font-size: 2rem;
-          gap: 20px;
+          font-size: 1.5rem;
+          gap: 12px;
         }
-        .center-message p { margin: 10px 0; }
-        .center-message.error { color: #ff6b6b; }
+        .center-msg p { margin: 6px 0; }
+        .center-msg.error { color: #ff6b6b; }
 
-        .loading-dots {
+        .dots {
           display: flex;
-          gap: 10px;
+          gap: 6px;
         }
-        .loading-dots span {
-          width: 14px;
-          height: 14px;
+        .dots span {
+          width: 10px;
+          height: 10px;
           background: rgba(255,255,255,0.8);
           border-radius: 50%;
           animation: bounce 1.4s infinite ease-in-out both;
         }
-        .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
-        .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+        .dots span:nth-child(1) { animation-delay: -0.32s; }
+        .dots span:nth-child(2) { animation-delay: -0.16s; }
         @keyframes bounce {
           0%, 80%, 100% { transform: scale(0); }
           40% { transform: scale(1); }
         }
 
-        .board-content {
+        .content {
           flex: 1;
           display: flex;
           flex-direction: column;
@@ -275,133 +264,161 @@ export default function StreamingBlackboard({
           overflow: hidden;
         }
 
-        .board-content.clearing {
-          animation: magicalClear 0.5s ease-out forwards;
+        .content.clearing {
+          animation: fadeOut 0.5s ease-out forwards;
         }
-        @keyframes magicalClear {
-          0% { opacity: 1; filter: blur(0); }
-          100% { opacity: 0; filter: blur(4px); transform: translateY(-10px); }
+        @keyframes fadeOut {
+          to { opacity: 0; filter: blur(4px); }
         }
 
-        .speaking-badge {
+        .speaking {
           position: absolute;
-          top: 15px;
-          right: 20px;
-          background: rgba(102, 126, 234, 0.4);
-          padding: 6px 14px;
-          border-radius: 14px;
-          font-size: 0.9rem;
+          top: 8px;
+          right: 12px;
+          background: rgba(102,126,234,0.4);
+          padding: 4px 10px;
+          border-radius: 10px;
+          font-size: 0.75rem;
           animation: pulse 1.5s infinite;
-          z-index: 10;
         }
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.6; }
         }
 
-        .board-title {
-          font-size: 2.2rem;
+        .main-title {
+          font-size: 1.4rem;
           text-align: center;
-          border-bottom: 3px solid rgba(255,255,255,0.3);
-          padding-bottom: 12px;
-          margin-bottom: 20px;
+          border-bottom: 2px solid rgba(255,255,255,0.3);
+          padding-bottom: 8px;
+          margin-bottom: 10px;
           flex-shrink: 0;
         }
 
-        .board-body {
+        .layout {
           flex: 1;
           display: flex;
-          gap: 30px;
+          gap: 15px;
           overflow: hidden;
         }
 
-        .text-column {
+        .text-side {
           flex: 1;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 4px;
           overflow: hidden;
         }
 
-        .board-line {
-          font-size: 1.4rem;
-          line-height: 1.5;
+        .line {
+          font-size: 1rem;
+          line-height: 1.35;
           white-space: pre-wrap;
           word-wrap: break-word;
         }
 
-        .board-title-text { font-size: 1.8rem; color: #ffd700 !important; }
-        .board-heading-text { font-size: 1.6rem; color: #87ceeb !important; margin-top: 8px; }
-        .board-normal-text { font-size: 1.4rem; }
-        .board-formula-text { 
+        .line-title { font-size: 1.2rem; color: #ffd700 !important; }
+        .line-heading { font-size: 1.1rem; color: #87ceeb !important; margin-top: 4px; }
+        .line-normal { font-size: 1rem; }
+        .line-formula { 
           font-family: 'Times New Roman', serif;
           background: rgba(0,0,0,0.2);
-          padding: 8px 12px;
-          border-radius: 6px;
+          padding: 4px 8px;
+          border-radius: 4px;
           display: inline-block;
         }
-        .board-bullet-text { padding-left: 16px; }
-        .board-highlight-text {
+        .line-bullet { padding-left: 12px; }
+        .line-highlight {
           color: #ffd700 !important;
           background: rgba(255,215,0,0.1);
-          border-left: 4px solid #ffd700;
-          padding-left: 12px;
+          border-left: 3px solid #ffd700;
+          padding-left: 8px;
         }
 
-        .cursor {
+        .caret {
           animation: blink 0.7s infinite;
           color: #ffd700;
-          font-weight: bold;
         }
         @keyframes blink {
           0%, 100% { opacity: 1; }
           50% { opacity: 0; }
         }
 
-        .complete-badge {
+        .done {
           margin-top: auto;
-          padding: 14px;
-          background: rgba(76, 175, 80, 0.2);
-          border: 2px solid rgba(76, 175, 80, 0.4);
-          border-radius: 10px;
+          padding: 10px;
+          background: rgba(76,175,80,0.2);
+          border: 1px solid rgba(76,175,80,0.4);
+          border-radius: 6px;
           text-align: center;
           color: #81c784;
-          font-size: 1.5rem;
+          font-size: 1.1rem;
         }
 
-        .image-column {
-          width: 350px;
+        .image-side {
+          width: 280px;
           flex-shrink: 0;
           display: flex;
           align-items: flex-start;
           justify-content: center;
         }
 
-        .media-box {
+        .img-box {
           background: rgba(255,255,255,0.08);
-          padding: 12px;
-          border-radius: 12px;
-          border: 2px solid rgba(255,255,255,0.15);
-          animation: fadeIn 0.5s ease-out;
-          max-width: 100%;
+          padding: 8px;
+          border-radius: 8px;
+          border: 1px solid rgba(255,255,255,0.15);
+          animation: fadeIn 0.4s ease-out;
         }
         @keyframes fadeIn {
           from { opacity: 0; transform: scale(0.95); }
           to { opacity: 1; transform: scale(1); }
         }
 
-        .media-box img {
-          max-width: 320px;
-          max-height: 350px;
-          border-radius: 8px;
+        .img-box img {
+          max-width: 260px;
+          max-height: 280px;
+          border-radius: 6px;
           display: block;
         }
 
-        .media-label {
-          margin-top: 10px;
-          font-size: 1.1rem;
+        .img-label {
+          margin-top: 6px;
+          font-size: 0.85rem;
           color: #ffd700;
           text-align: center;
+        }
+
+        .pagination {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          margin-top: 8px;
+          flex-shrink: 0;
+        }
+
+        .pagination button {
+          background: rgba(255,255,255,0.15);
+          border: 1px solid rgba(255,255,255,0.3);
+          color: #fff;
+          padding: 4px 12px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 0.8rem;
+          transition: background 0.2s;
+        }
+        .pagination button:hover:not(:disabled) {
+          background: rgba(255,255,255,0.25);
+        }
+        .pagination button:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .page-info {
+          font-size: 0.8rem;
+          color: rgba(255,255,255,0.7);
         }
       `}</style>
     </div>
