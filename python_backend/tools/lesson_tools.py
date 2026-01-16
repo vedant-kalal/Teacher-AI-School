@@ -8,13 +8,14 @@ from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 import httpx
 
-llm = ChatOpenAI(
-    model="gpt-4o-mini",
-    base_url=os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL"),
-    api_key=os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY"),
-    temperature=0.7,
-    max_tokens=500
-)
+def get_llm():
+    """Get LLM instance - deferred initialization to allow env vars to be set"""
+    return ChatOpenAI(
+        model="gpt-4o-mini",
+        base_url=os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL"),
+        api_key=os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", ""),
+        temperature=0.7,
+    )
 
 def generate_image(prompt: str, size: str = "1024x1024") -> dict:
     """Generate an actual image using OpenAI's gpt-image-1 model"""
@@ -75,6 +76,7 @@ def content_planner(topic: str) -> dict:
     """
     print(f"🎯 [ContentPlanner] Analyzing media needs for: {topic}")
     
+    llm = get_llm()
     response = llm.invoke(
         f"Analyze the topic '{topic}' and determine which media types would be helpful for teaching it.\n"
         f"Consider:\n"
@@ -120,6 +122,7 @@ def lesson_planner(topic: str, target_audience: str = "high school students") ->
     """
     print(f"📚 [LessonPlanner] Creating plan for: {topic}")
     
+    llm = get_llm()
     response = llm.invoke(
         f"Create a brief lesson outline for '{topic}' for {target_audience}. "
         f"Include: title, 3 learning objectives, and 3 key points. Keep it concise."
@@ -151,6 +154,7 @@ def board_writer(topic: str) -> dict:
     """
     print(f"✏️ [BoardWriter] Creating board content for: {topic}")
     
+    llm = get_llm()
     response = llm.invoke(
         f"Create blackboard notes for teaching '{topic}'. Include:\n"
         f"- Main title\n- Key definitions (2-3)\n- Important formulas or facts\n"
@@ -251,6 +255,7 @@ def simulation_3d_creator(topic: str) -> dict:
     """
     print(f"🎮 [3DSimulation] Creating simulation for: {topic}")
     
+    llm = get_llm()
     response = llm.invoke(
         f"Create a simple 3D scene specification for teaching '{topic}'. "
         f"Return a JSON object with:\n"
@@ -299,6 +304,7 @@ def video_storyboard(topic: str, duration: str = "3 minutes") -> dict:
     """
     print(f"🎬 [VideoStoryboard] Creating storyboard for: {topic}")
     
+    llm = get_llm()
     response = llm.invoke(
         f"Create a brief video storyboard for a {duration} educational video about '{topic}'. "
         f"Include 3-4 scenes with: scene number, visual description, narration text. "

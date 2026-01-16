@@ -10,16 +10,12 @@ from typing import Dict, Any, List, Optional, Tuple
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
-OPENAI_BASE_URL = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL")
-OPENAI_API_KEY = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY")
-
-
 def get_llm(model: str = "gpt-4o-mini", temperature: float = 0.7) -> ChatOpenAI:
     return ChatOpenAI(
         model=model,
         temperature=temperature,
-        base_url=OPENAI_BASE_URL,
-        api_key=OPENAI_API_KEY
+        base_url=os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL"),
+        api_key=os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
     )
 
 
