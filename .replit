@@ -1,4 +1,4 @@
-modules = ["bash", "web", "nodejs-22", "python-3.11"]
+modules = ["python-3.11", "bash", "web", "nodejs-22"]
 
 [agent]
 stack = "AGENT_STACK"

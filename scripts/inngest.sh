@@ -5,7 +5,7 @@ set -e
 INNGEST_CONFIG=".config/inngest/inngest.yaml"
 
 echo "🐍 Starting Python AI Teacher backend on port 8001..."
-cd python_backend && python3 main.py &
+cd python_backend && python main.py &
 PYTHON_PID=$!
 cd ..
 echo "🐍 Python server started with PID $PYTHON_PID"
