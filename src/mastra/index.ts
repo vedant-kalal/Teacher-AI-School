@@ -5,6 +5,8 @@ import { LogLevel, MastraLogger } from "@mastra/core/logger";
 import pino from "pino";
 import { NonRetriableError } from "inngest";
 import { z } from "zod";
+import * as fs from "fs";
+import * as path from "path";
 
 import { sharedPostgresStorage } from "./storage";
 import { inngest, inngestServe } from "./inngest";
@@ -106,6 +108,46 @@ export const mastra = new Mastra({
         path: "/api/inngest",
         method: "ALL",
         createHandler: async ({ mastra }) => inngestServe({ mastra, inngest }),
+      },
+      {
+        path: "/ui",
+        method: "GET",
+        createHandler: async ({ mastra }) => async (c) => {
+          const logger = mastra?.getLogger();
+          try {
+            const distDir = process.env.UI_DIST_DIR || path.resolve(process.cwd(), "dist");
+            const htmlPath = path.join(distDir, "index.html");
+            logger?.debug("📄 [UI] Serving index.html from:", { distDir, htmlPath });
+            const html = fs.readFileSync(htmlPath, "utf-8");
+            return c.html(html);
+          } catch (e) {
+            logger?.warn("⚠️ [UI] Failed to serve index.html:", { error: String(e) });
+            return c.text("UI not built. Run: cd web && npx vite build --outDir ../dist", 500);
+          }
+        },
+      },
+      {
+        path: "/assets/*",
+        method: "GET",
+        createHandler: async ({ mastra }) => async (c) => {
+          const logger = mastra?.getLogger();
+          try {
+            const distDir = process.env.UI_DIST_DIR || path.resolve(process.cwd(), "dist");
+            const reqPath = c.req.path;
+            const filePath = path.join(distDir, reqPath);
+            logger?.debug("📦 [Assets] Serving:", { filePath });
+            const content = fs.readFileSync(filePath);
+            const ext = path.extname(filePath);
+            const contentType = ext === ".js" ? "application/javascript" : 
+                               ext === ".css" ? "text/css" : 
+                               ext === ".png" ? "image/png" : 
+                               ext === ".svg" ? "image/svg+xml" : "application/octet-stream";
+            return new Response(content, { headers: { "Content-Type": contentType } });
+          } catch (e) {
+            logger?.warn("⚠️ [Assets] File not found:", { path: c.req.path });
+            return c.notFound();
+          }
+        },
       },
     ],
   },

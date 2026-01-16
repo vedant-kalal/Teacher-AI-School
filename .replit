@@ -23,6 +23,14 @@ externalPort = 3000
 exposeLocalhost = true
 
 [[ports]]
+localPort = 3001
+externalPort = 4200
+
+[[ports]]
+localPort = 4111
+externalPort = 3003
+
+[[ports]]
 localPort = 5000
 externalPort = 80
 
@@ -68,3 +76,8 @@ waitForPort = 3000
 
 [workflows.workflow.metadata]
 outputType = "automations"
+
+[userenv]
+
+[userenv.shared]
+UI_DIST_DIR = "/home/runner/workspace/dist"
