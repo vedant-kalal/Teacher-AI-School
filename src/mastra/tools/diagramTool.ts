@@ -4,6 +4,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import OpenAI from "openai";
 import { normalizeDiagramData } from "./utils/schemaValidation";
+import * as fs from "fs";
+import * as path from "path";
 
 const openaiClient = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -42,8 +44,7 @@ export const diagramTool = createTool({
         pointerDirection: z.enum(["top", "bottom", "left", "right"]),
       })),
     }),
-    imageUrl: z.string().optional(),
-    imageBase64: z.string().optional(),
+    imagePath: z.string().optional(),
     teacherNarration: z.string(),
   }),
   execute: async ({ context: ctx, mastra }) => {
@@ -102,7 +103,7 @@ Return a JSON object with:
     const diagramData = normalizeDiagramData(rawDiagramData, ctx.subject);
     logger?.info("✅ [DiagramTool] Diagram data normalized with", { elementCount: diagramData.elements.length });
 
-    let imageBase64 = "";
+    let imagePath = "";
     try {
       const imagePrompt = `Create an educational ${ctx.style || "hand-drawn"} style diagram of ${ctx.subject}. 
       This should look like a teacher drew it on a whiteboard with markers.
@@ -118,7 +119,22 @@ Return a JSON object with:
         size: "1024x1024",
       });
 
-      imageBase64 = imageResponse.data?.[0]?.b64_json || "";
+      const imageBase64 = imageResponse.data?.[0]?.b64_json || "";
+      if (imageBase64) {
+        const timestamp = Date.now();
+        const sanitizedSubject = ctx.subject.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
+        const filename = `diagram_${sanitizedSubject}_${timestamp}.png`;
+        const outputDir = path.join(process.cwd(), "public", "generated_images");
+        
+        if (!fs.existsSync(outputDir)) {
+          fs.mkdirSync(outputDir, { recursive: true });
+        }
+        
+        const filepath = path.join(outputDir, filename);
+        fs.writeFileSync(filepath, Buffer.from(imageBase64, "base64"));
+        imagePath = `/generated_images/${filename}`;
+        logger?.info("✅ [DiagramTool] Diagram image saved to:", { imagePath });
+      }
       logger?.info("✅ [DiagramTool] Diagram image generated successfully");
     } catch (imgError) {
       logger?.error("❌ [DiagramTool] Image generation failed:", { error: imgError });
@@ -126,7 +142,7 @@ Return a JSON object with:
 
     return {
       diagramData,
-      imageBase64: imageBase64 || undefined,
+      imagePath: imagePath || undefined,
       teacherNarration,
     };
   },

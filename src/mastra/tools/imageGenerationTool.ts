@@ -1,6 +1,8 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import OpenAI from "openai";
+import * as fs from "fs";
+import * as path from "path";
 
 const openaiClient = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -18,7 +20,7 @@ export const imageGenerationTool = createTool({
     annotationPoints: z.array(z.string()).optional().describe("Key points in the image that the teacher should point to and explain"),
   }),
   outputSchema: z.object({
-    imageBase64: z.string(),
+    imagePath: z.string(),
     annotatedPoints: z.array(z.object({
       label: z.string(),
       description: z.string(),
@@ -43,7 +45,7 @@ Requirements:
 - Good contrast and visibility for projection
 ${ctx.annotationPoints ? `Key features to show clearly: ${ctx.annotationPoints.join(", ")}` : ""}`;
 
-    let imageBase64 = "";
+    let imagePath = "";
     try {
       const response = await openaiClient.images.generate({
         model: "gpt-image-1",
@@ -51,11 +53,26 @@ ${ctx.annotationPoints ? `Key features to show clearly: ${ctx.annotationPoints.j
         size: "1024x1024",
       });
 
-      imageBase64 = response.data?.[0]?.b64_json || "";
+      const imageBase64 = response.data?.[0]?.b64_json || "";
+      if (imageBase64) {
+        const timestamp = Date.now();
+        const sanitizedDesc = ctx.description.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
+        const filename = `image_${sanitizedDesc}_${timestamp}.png`;
+        const outputDir = path.join(process.cwd(), "public", "generated_images");
+        
+        if (!fs.existsSync(outputDir)) {
+          fs.mkdirSync(outputDir, { recursive: true });
+        }
+        
+        const filepath = path.join(outputDir, filename);
+        fs.writeFileSync(filepath, Buffer.from(imageBase64, "base64"));
+        imagePath = `/generated_images/${filename}`;
+        logger?.info("✅ [ImageGenerationTool] Image saved to:", { imagePath });
+      }
       logger?.info("✅ [ImageGenerationTool] Image generated successfully");
     } catch (error) {
       logger?.error("❌ [ImageGenerationTool] Failed to generate image:", { error });
-      throw new Error("Failed to generate educational image");
+      imagePath = "";
     }
 
     const annotatedPoints = (ctx.annotationPoints || []).map((point, index) => ({
@@ -69,7 +86,7 @@ ${annotatedPoints.map((p) => `Look at the ${p.approximateLocation} area - this s
 This visual representation helps us understand the concept more clearly.`;
 
     return {
-      imageBase64,
+      imagePath,
       annotatedPoints,
       teacherScript,
     };
