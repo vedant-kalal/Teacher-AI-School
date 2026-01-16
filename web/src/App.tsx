@@ -71,25 +71,19 @@ export default function App() {
         html, body, #root {
           margin: 0;
           padding: 0;
-          height: 100vh;
-          width: 100vw;
-          overflow: hidden !important;
-          position: fixed;
-          top: 0;
-          left: 0;
+          height: 100%;
+          width: 100%;
+          overflow: hidden;
         }
 
         .app {
           height: 100vh;
           width: 100vw;
-          overflow: hidden !important;
+          overflow: hidden;
           display: flex;
           flex-direction: column;
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-          position: fixed;
-          top: 0;
-          left: 0;
-          padding: 10px 20px;
+          padding: 15px 20px;
         }
 
         .header {
@@ -98,7 +92,7 @@ export default function App() {
           justify-content: space-between;
           gap: 20px;
           flex-shrink: 0;
-          padding: 10px 0;
+          padding-bottom: 15px;
         }
 
         .header h1 {
@@ -115,8 +109,8 @@ export default function App() {
         .main-content {
           flex: 1;
           display: flex;
-          overflow: hidden !important;
           min-height: 0;
+          overflow: hidden;
         }
 
         .narration-bar {
@@ -124,7 +118,7 @@ export default function App() {
           align-items: center;
           justify-content: center;
           gap: 16px;
-          padding: 12px 24px;
+          padding: 10px 24px;
           background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
           border-radius: 12px;
           border: 1px solid rgba(102, 126, 234, 0.3);

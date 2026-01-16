@@ -11,8 +11,6 @@ interface StreamingBlackboardProps {
   onStopNarration?: () => void;
 }
 
-const MAX_LINES_ON_BOARD = 10;
-
 export default function StreamingBlackboard({
   boardState,
   isNarrating,
@@ -22,8 +20,7 @@ export default function StreamingBlackboard({
 }: StreamingBlackboardProps) {
   const [animatedLines, setAnimatedLines] = useState<Map<string, string>>(new Map());
   const [clearAnimation, setClearAnimation] = useState(false);
-  const [visibleLines, setVisibleLines] = useState<BoardLine[]>([]);
-  const boardContentRef = useRef<HTMLDivElement>(null);
+  const textAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (boardState.isClearing) {
@@ -31,56 +28,20 @@ export default function StreamingBlackboard({
       const timer = setTimeout(() => {
         setClearAnimation(false);
         setAnimatedLines(new Map());
-        setVisibleLines([]);
       }, 600);
       return () => clearTimeout(timer);
     }
   }, [boardState.isClearing]);
 
   useEffect(() => {
-    const totalLines = boardState.lines.reduce((count, line) => {
-      const lineCount = (cleanTextForBoard(line.text).match(/\n/g) || []).length + 1;
-      return count + lineCount;
-    }, 0);
-
-    if (totalLines > MAX_LINES_ON_BOARD) {
-      const linesToKeep: BoardLine[] = [];
-      let currentLineCount = 0;
-      
-      for (let i = boardState.lines.length - 1; i >= 0; i--) {
-        const line = boardState.lines[i];
-        const lineCount = (cleanTextForBoard(line.text).match(/\n/g) || []).length + 1;
-        
-        if (currentLineCount + lineCount <= MAX_LINES_ON_BOARD) {
-          linesToKeep.unshift(line);
-          currentLineCount += lineCount;
-        } else {
-          break;
-        }
+    boardState.lines.forEach((line) => {
+      if (!animatedLines.has(line.id)) {
+        animateLine(line);
       }
-      
-      if (linesToKeep.length < boardState.lines.length && !clearAnimation) {
-        setClearAnimation(true);
-        setTimeout(() => {
-          setClearAnimation(false);
-          setVisibleLines(linesToKeep);
-          const newAnimatedLines = new Map<string, string>();
-          linesToKeep.forEach(line => {
-            newAnimatedLines.set(line.id, cleanTextForBoard(line.text));
-          });
-          setAnimatedLines(newAnimatedLines);
-        }, 400);
-      } else {
-        setVisibleLines(linesToKeep);
-      }
-    } else {
-      setVisibleLines(boardState.lines);
-      
-      boardState.lines.forEach((line) => {
-        if (!animatedLines.has(line.id)) {
-          animateLine(line);
-        }
-      });
+    });
+    
+    if (textAreaRef.current) {
+      textAreaRef.current.scrollTop = textAreaRef.current.scrollHeight;
     }
   }, [boardState.lines]);
 
@@ -154,7 +115,7 @@ export default function StreamingBlackboard({
     }
 
     return (
-      <div className={`board-content ${clearAnimation ? 'clearing' : ''}`} ref={boardContentRef}>
+      <div className={`board-content ${clearAnimation ? 'clearing' : ''}`}>
         {title && (
           <h2 className="board-main-title handwriting">{title}</h2>
         )}
@@ -166,54 +127,41 @@ export default function StreamingBlackboard({
           </div>
         )}
 
-        <div className="board-text-area">
-          <div className="board-lines">
-            {visibleLines.map((line) => {
-              const displayText = animatedLines.get(line.id) || '';
-              const isComplete = displayText.length >= cleanTextForBoard(line.text).length;
+        <div className="board-layout">
+          <div className="board-text-area" ref={textAreaRef}>
+            <div className="board-lines">
+              {boardState.lines.map((line) => {
+                const displayText = animatedLines.get(line.id) || '';
+                const isComplete = displayText.length >= cleanTextForBoard(line.text).length;
 
-              return (
-                <div
-                  key={line.id}
-                  className={`board-line ${getStyleClasses(line.style)} handwriting`}
-                  style={{ color: line.color === 'yellow' ? '#ffd700' : 'rgba(255, 255, 255, 0.95)' }}
-                >
-                  {displayText.split('\n').map((textLine, idx) => (
-                    <div key={idx} className="text-line">
-                      {textLine}
-                      {idx === displayText.split('\n').length - 1 && !isComplete && (
-                        <span className="cursor">|</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                return (
+                  <div
+                    key={line.id}
+                    className={`board-line ${getStyleClasses(line.style)} handwriting`}
+                    style={{ color: line.color === 'yellow' ? '#ffd700' : 'rgba(255, 255, 255, 0.95)' }}
+                  >
+                    {displayText.split('\n').map((textLine, idx) => (
+                      <div key={idx} className="text-line">
+                        {textLine}
+                        {idx === displayText.split('\n').length - 1 && !isComplete && (
+                          <span className="cursor">|</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
 
-        {lessonStatus === 'completed' && (
-          <div className="lesson-complete handwriting">
-            <p>✅ Lesson Complete!</p>
+            {lessonStatus === 'completed' && (
+              <div className="lesson-complete handwriting">
+                <p>✅ Lesson Complete!</p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    );
-  };
 
-  return (
-    <div className="streaming-blackboard-container">
-      <div className="blackboard-frame">
-        <div className="blackboard">
-          <div className="chalk-tray">
-            <div className="chalk white"></div>
-            <div className="chalk yellow"></div>
-            <div className="chalk blue"></div>
-          </div>
-          {renderBoardContent()}
-          
           {boardState.currentMedia && (
-            <div className="board-media-container">
+            <div className="board-media-area">
               <div className="media-frame">
                 {(boardState.currentMedia.image_base64 || boardState.currentMedia.image_url) && (
                   <img
@@ -232,12 +180,27 @@ export default function StreamingBlackboard({
           )}
         </div>
       </div>
+    );
+  };
+
+  return (
+    <div className="streaming-blackboard-container">
+      <div className="blackboard-frame">
+        <div className="blackboard">
+          <div className="chalk-tray">
+            <div className="chalk white"></div>
+            <div className="chalk yellow"></div>
+            <div className="chalk blue"></div>
+          </div>
+          {renderBoardContent()}
+        </div>
+      </div>
 
       <style>{`
         .streaming-blackboard-container {
           width: 100%;
           height: 100%;
-          overflow: hidden !important;
+          min-height: 500px;
         }
 
         .blackboard-frame {
@@ -249,20 +212,20 @@ export default function StreamingBlackboard({
             inset 0 2px 0 rgba(255, 255, 255, 0.15),
             inset 0 -2px 0 rgba(0, 0, 0, 0.3);
           height: 100%;
-          overflow: hidden !important;
+          min-height: 500px;
         }
 
         .blackboard {
           background: linear-gradient(145deg, #1a472a 0%, #0d2818 40%, #153d24 70%, #1a472a 100%);
           width: 100%;
           height: 100%;
+          min-height: 460px;
           border-radius: 6px;
-          padding: 25px 35px;
+          padding: 25px 35px 40px 35px;
           position: relative;
           box-shadow: 
             inset 0 0 60px rgba(0, 0, 0, 0.4),
             inset 0 0 15px rgba(0, 0, 0, 0.3);
-          overflow: hidden !important;
           display: flex;
           flex-direction: column;
         }
@@ -323,9 +286,8 @@ export default function StreamingBlackboard({
           flex: 1;
           display: flex;
           flex-direction: column;
-          overflow: hidden !important;
           position: relative;
-          padding-bottom: 30px;
+          min-height: 0;
         }
 
         .board-content.clearing {
@@ -351,7 +313,7 @@ export default function StreamingBlackboard({
         }
 
         .board-main-title {
-          font-size: 2.2rem;
+          font-size: 2rem;
           text-align: center;
           margin-bottom: 16px;
           border-bottom: 3px solid rgba(255, 255, 255, 0.3);
@@ -388,24 +350,44 @@ export default function StreamingBlackboard({
           color: #fff;
         }
 
+        .board-layout {
+          flex: 1;
+          display: flex;
+          gap: 20px;
+          min-height: 0;
+          overflow: hidden;
+        }
+
         .board-text-area {
           flex: 1;
-          overflow: hidden !important;
-          display: flex;
-          flex-direction: column;
-          max-width: 60%;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding-right: 10px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,0.3) transparent;
+        }
+
+        .board-text-area::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .board-text-area::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .board-text-area::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.3);
+          border-radius: 3px;
         }
 
         .board-lines {
           display: flex;
           flex-direction: column;
           gap: 8px;
-          overflow: hidden !important;
         }
 
         .board-line {
           line-height: 1.4;
-          flex-shrink: 0;
         }
 
         .text-line {
@@ -465,14 +447,26 @@ export default function StreamingBlackboard({
           50% { opacity: 0; }
         }
 
-        .board-media-container {
-          position: absolute;
-          right: 25px;
-          top: 70px;
-          width: 320px;
-          max-width: 35%;
+        .board-media-area {
+          width: 300px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          position: sticky;
+          top: 0;
+          align-self: flex-start;
+        }
+
+        .media-frame {
+          display: flex;
+          flex-direction: column;
+          background: rgba(255, 255, 255, 0.1);
+          padding: 12px;
+          border-radius: 12px;
+          border: 2px solid rgba(255, 255, 255, 0.2);
+          backdrop-filter: blur(4px);
           animation: fadeInMedia 0.6s ease-out;
-          z-index: 20;
         }
 
         @keyframes fadeInMedia {
@@ -486,19 +480,9 @@ export default function StreamingBlackboard({
           }
         }
 
-        .media-frame {
-          display: flex;
-          flex-direction: column;
-          background: rgba(255, 255, 255, 0.1);
-          padding: 12px;
-          border-radius: 12px;
-          border: 2px solid rgba(255, 255, 255, 0.2);
-          backdrop-filter: blur(4px);
-        }
-
         .board-media-image {
           width: 100%;
-          max-height: 280px;
+          max-height: 250px;
           object-fit: contain;
           border-radius: 8px;
           box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
@@ -557,7 +541,7 @@ export default function StreamingBlackboard({
         }
 
         .lesson-complete {
-          margin-top: auto;
+          margin-top: 20px;
           text-align: center;
           padding: 16px;
           background: rgba(76, 175, 80, 0.2);
