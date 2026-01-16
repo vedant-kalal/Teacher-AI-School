@@ -81,7 +81,7 @@ Return a JSON object with complete video planning:
 }`;
 
     const result = await generateText({
-      model: openai("gpt-4o"),
+      model: openai("gpt-4o-mini"),
       prompt: storyboardPrompt,
       temperature: 0.7,
     });

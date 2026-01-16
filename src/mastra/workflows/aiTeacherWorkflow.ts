@@ -23,7 +23,7 @@ const planLessonStep = createStep({
     logger?.info("📚 [Step 1: Plan Lesson] Starting lesson planning for:", { topic: inputData.topic });
 
     const prompt = `Create a lesson plan about "${inputData.topic}" for high school students. Use the lesson-planner-tool.`;
-    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 2 });
+    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 1 });
 
     const toolResults = response.steps?.flatMap(s => s.toolResults || []) || [];
     const planResult = (toolResults[0] as any)?.result || {};
@@ -52,7 +52,7 @@ const generateBoardContentStep = createStep({
     logger?.info("✏️ [Step 2: Board Content] Generating blackboard writing");
 
     const prompt = `Create blackboard content for "${inputData.topic}". Use the board-writing-tool.`;
-    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 2 });
+    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 1 });
 
     const toolResults = response.steps?.flatMap(s => s.toolResults || []) || [];
     const boardResult = (toolResults[0] as any)?.result || {};
@@ -79,7 +79,7 @@ const generateDiagramsStep = createStep({
     logger?.info("📊 [Step 3: Diagrams] Creating educational diagrams");
 
     const prompt = `Create a diagram for "${inputData.topic}". Use the diagram-tool.`;
-    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 2 });
+    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 1 });
 
     const toolResults = response.steps?.flatMap(s => s.toolResults || []) || [];
     const diagramResult = (toolResults[0] as any)?.result || {};
@@ -106,7 +106,7 @@ const generateImagesStep = createStep({
     logger?.info("🖼️ [Step 4: Images] Generating educational images");
 
     const prompt = `Create an educational image for "${inputData.topic}". Use the image-generation-tool.`;
-    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 2 });
+    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 1 });
 
     const toolResults = response.steps?.flatMap(s => s.toolResults || []) || [];
     const imageResult = (toolResults[0] as any)?.result || {};
@@ -132,7 +132,7 @@ const generate3DSimulationStep = createStep({
     logger?.info("🎮 [Step 5: 3D Simulation] Creating interactive 3D content");
 
     const prompt = `Create a 3D simulation for "${inputData.topic}". Use the simulation-3d-tool.`;
-    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 2 });
+    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 1 });
 
     const toolResults = response.steps?.flatMap(s => s.toolResults || []) || [];
     const simResult = (toolResults[0] as any)?.result || {};
@@ -158,7 +158,7 @@ const generateVideoStep = createStep({
     logger?.info("🎬 [Step 6: Video] Creating video content");
 
     const prompt = `Create a video storyboard for "${inputData.topic}". Use the video-creation-tool.`;
-    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 2 });
+    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 1 });
 
     const toolResults = response.steps?.flatMap(s => s.toolResults || []) || [];
     const videoResult = (toolResults[0] as any)?.result || {};
@@ -185,7 +185,7 @@ const qualityReviewStep = createStep({
     logger?.info("🔍 [Step 7: Quality Review] Reviewing all content");
 
     const prompt = `Review teaching content quality for "${inputData.topic}". Use quality-monitor-tool.`;
-    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 2 });
+    const response = await aiTeacherAgent.generateLegacy([{ role: "user", content: prompt }], { maxSteps: 1 });
 
     const toolResults = response.steps?.flatMap(s => s.toolResults || []) || [];
     const qualityResult = (toolResults[0] as any)?.result || {};

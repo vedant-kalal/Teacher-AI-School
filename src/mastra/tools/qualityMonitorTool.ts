@@ -76,7 +76,7 @@ Return a JSON object with this structure:
 }`;
 
     const result = await generateText({
-      model: openai("gpt-4o"),
+      model: openai("gpt-4o-mini"),
       prompt: reviewPrompt,
       temperature: 0.4,
     });

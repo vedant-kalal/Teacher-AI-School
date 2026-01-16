@@ -38,41 +38,14 @@ export const lessonPlannerTool = createTool({
     const logger = mastra?.getLogger();
     logger?.info("📚 [LessonPlannerTool] Creating lesson plan for:", { topic: context.topic });
 
-    const prompt = `You are an expert educational curriculum designer. Create a detailed, structured lesson plan for teaching "${context.topic}" to ${context.targetAudience || "high school students"} in approximately ${context.duration || "45 minutes"}.
-
-The lesson plan should include various teaching modalities to engage students:
-1. Introduction - Hook the students, explain why this topic matters
-2. Basic concepts - Explain fundamental ideas
-3. Board writing - Key formulas, definitions, or notes written on a blackboard
-4. Diagrams - Educational diagrams to visualize concepts
-5. Images - Real-world images or illustrations
-6. 3D Simulations - Interactive 3D models to demonstrate concepts
-7. Video - Optional video explanations or demonstrations
-8. Conclusion - Summary and key takeaways
-
-Return a JSON object with this exact structure:
-{
-  "topic": "string",
-  "overview": "string",
-  "learningObjectives": ["objective1", "objective2", ...],
-  "teachingSteps": [
-    {
-      "stepNumber": 1,
-      "type": "introduction|explanation|board_writing|diagram|image|simulation_3d|video|interactive|conclusion",
-      "title": "string",
-      "description": "string",
-      "duration": "string",
-      "content": "detailed content for this step"
-    }
-  ],
-  "keyPoints": ["point1", "point2", ...],
-  "summary": "string"
-}`;
+    const prompt = `Create a brief lesson outline for "${context.topic}" (${context.targetAudience || "high school"}). Return JSON:
+{"topic":"${context.topic}","overview":"1-2 sentences","learningObjectives":["obj1","obj2","obj3"],"teachingSteps":[{"stepNumber":1,"type":"introduction","title":"","description":"","duration":"5min","content":""}],"keyPoints":["p1","p2"],"summary":"1 sentence"}`;
 
     const result = await generateText({
-      model: openai("gpt-4o"),
+      model: openai("gpt-4o-mini"),
       prompt,
-      temperature: 0.7,
+      temperature: 0.5,
+      maxTokens: 500,
     });
 
     logger?.info("✅ [LessonPlannerTool] Lesson plan created successfully");
