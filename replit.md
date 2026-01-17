@@ -121,12 +121,13 @@ curl -X POST http://localhost:5000/api/stream/lesson/start \
 
 ## User Preferences
 
-- Teaching style: Natural chalkboard simulation with synchronized narration
+- Teaching style: Explain like teaching a 10-12 year old student, from basics, with simple language
 - Visual planning: Intelligent pre-analysis of script for optimal visual timing
-- Target audience: High school students
+- Target audience: Young students (10-12 years old) learning from scratch
 - LLM: GPT-4o for visual planning, GPT-4o-mini for fast responses
+- Content: NO emojis, detailed explanations, complex terms explained simply
 - Blackboard: Full-screen, edge-to-edge board with dynamic layout per segment
-- Layout: BoardLayoutAgent intelligently decides text size, image size/position based on content
-- Images: Large and prominent, positioned dynamically (left/right/top/bottom) based on content
+- Layout: Text gets 75-85% of board width, images in small gallery (15-25%)
+- Images: Small gallery on right side showing multiple images (up to 6)
 - Scrolling: Auto-scroll to new content as it appears
-- Narration: Speaking indicator shows during board writing, synced with text animation
+- Narration: Speaking indicator shows during board writing, synced with text animation, explains each visual

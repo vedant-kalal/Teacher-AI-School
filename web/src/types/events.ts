@@ -114,11 +114,11 @@ export interface BoardLayout {
 
 export const DEFAULT_LAYOUT: BoardLayout = {
   text_size: 'large',
-  text_width_percent: 60,
-  image_size: 'large',
-  image_width_percent: 40,
+  text_width_percent: 75,
+  image_size: 'small',
+  image_width_percent: 25,
   image_position: 'right',
-  image_height_percent: 70,
+  image_height_percent: 50,
   line_spacing: 'normal',
   board_padding: 'normal',
   title_size: 'large',
@@ -127,6 +127,7 @@ export const DEFAULT_LAYOUT: BoardLayout = {
 export interface BoardState {
   lines: BoardLine[];
   currentMedia: MediaReadyEvent | null;
+  mediaGallery: MediaReadyEvent[];
   isClearing: boolean;
   layout: BoardLayout;
 }
@@ -216,7 +217,8 @@ export function cleanTextForBoard(text: string): string {
     .replace(/`/g, '')
     .replace(/```/g, '')
     .replace(/---/g, '—')
-    .replace(/--/g, '–');
+    .replace(/--/g, '–')
+    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
 
   const lines = cleaned.split('\n');
   const cleanedLines = lines.map((line) => {

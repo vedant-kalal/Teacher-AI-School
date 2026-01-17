@@ -26,32 +26,39 @@ class ScriptPlannerAgent:
     
     async def plan_lesson_script(self, topic: str) -> Dict[str, Any]:
         llm = get_llm("gpt-4o-mini", 0.7)
-        prompt = f"""You are an expert educational content planner. Create a comprehensive, engaging lesson script for teaching about: {topic}
+        prompt = f"""You are an expert teacher who explains concepts to young students. Create a comprehensive, engaging lesson script for teaching about: {topic}
 
-Create a detailed lesson with 8-12 segments. Each segment should feel like a real teacher explaining in class.
+IMPORTANT: Teach like you are explaining to a 10-12 year old student who has never heard of this topic before.
+
+Create a detailed lesson with 10-14 segments. Each segment should feel like a real teacher explaining in class with patience and clarity.
 
 For EACH segment, provide:
-1. narration_text: What the teacher says (2-4 sentences, natural speaking style)
-2. board_text: What appears on the board (clean text, NO markdown symbols like # or *, use → for arrows, use actual math symbols)
+1. narration_text: What the teacher says (3-5 sentences, simple words, explain every concept from basics, use analogies and real-life examples)
+2. board_text: What appears on the board (detailed content with multiple points, definitions, examples - make it comprehensive)
 3. board_style: "title", "heading", "text", "formula", "bullet", or "highlight"
-4. needs_visual: true if this segment needs a diagram or image
+4. needs_visual: true if this segment needs a diagram or image (aim for 6-8 visuals per lesson)
 5. visual_type: "diagram", "image", "3d_model", or "video" (only if needs_visual is true)
 6. visual_prompt: A detailed prompt for generating the visual (only if needs_visual is true)
 7. clear_board: true if the board should be cleared before this segment
+8. complex_terms: List of difficult words/phrases in this segment that need simpler explanation
 
 Rules for board_text:
 - NO markdown symbols (no #, *, **, `, etc.)
+- NO emojis - keep it professional and clean
 - Use proper mathematical symbols: × ÷ ² ³ √ π θ α β γ Δ Σ Ω → ← ≤ ≥ ≠ ∞ °
-- Use emojis for engagement: 📝 💡 ⭐ ✅ 🔬 🧠 📚 ⚛️ 🌍 🚀
 - Use bullet points with • symbol
+- Write MORE content - at least 3-5 lines per segment
+- Include definitions, examples, and key points
 - Keep formulas clean and readable
 
-Make the content comprehensive with:
-- Clear introduction
-- Key concepts explained in detail
-- Multiple examples
-- Visual demonstrations
-- Summary
+Teaching style:
+- Start from absolute basics - assume the student knows nothing
+- Explain WHY things happen, not just WHAT happens
+- Use simple analogies (like comparing to everyday objects)
+- Break complex ideas into small, easy steps
+- Give real-world examples students can relate to
+- Include multiple examples for each concept
+- Explain every technical term in simple words
 
 Return ONLY valid JSON in this format:
 {{
@@ -67,7 +74,8 @@ Return ONLY valid JSON in this format:
       "visual_type": null,
       "visual_prompt": null,
       "clear_board": false,
-      "pause_after_ms": 500
+      "pause_after_ms": 500,
+      "complex_terms": ["difficult word 1", "technical phrase 2"]
     }}
   ],
   "key_formulas": ["E = mc²", "F = ma"],
@@ -94,30 +102,32 @@ Return ONLY valid JSON in this format:
     
     def _create_fallback_script(self, topic: str) -> Dict[str, Any]:
         return {
-            "title": f"📚 {topic}",
-            "introduction": f"Today we'll learn about {topic}",
+            "title": f"Understanding {topic}",
+            "introduction": f"Today we'll learn about {topic} from the very beginning",
             "segments": [
                 {
                     "segment_id": "seg_1",
-                    "narration_text": f"Welcome everyone! Today we're going to explore {topic}. This is a fascinating subject that I'm excited to share with you.",
-                    "board_text": f"📚 {topic}",
+                    "narration_text": f"Welcome everyone! Today we're going to explore {topic}. Don't worry if you've never heard of this before - we'll start from the very basics and I'll explain everything step by step.",
+                    "board_text": f"Today's Topic: {topic}\n\nWhat we will learn:\n• What is {topic}?\n• Why is it important?\n• How does it work?\n• Real examples from everyday life",
                     "board_style": "title",
                     "needs_visual": False,
                     "visual_type": None,
                     "visual_prompt": None,
                     "clear_board": True,
-                    "pause_after_ms": 1000
+                    "pause_after_ms": 1000,
+                    "complex_terms": []
                 },
                 {
                     "segment_id": "seg_2",
-                    "narration_text": f"Let's start by understanding what {topic} really means and why it's important.",
-                    "board_text": f"💡 Key Concepts:\n• Definition and overview\n• Main principles\n• Real-world applications",
+                    "narration_text": f"Let's start by understanding what {topic} really means. Think of it like this - I'll explain it in the simplest way possible so everyone can understand.",
+                    "board_text": f"What is {topic}?\n\nDefinition:\n{topic} is...\n\nIn simple words:\nImagine...\n\nKey Points:\n• Point 1 with explanation\n• Point 2 with example\n• Point 3 with why it matters",
                     "board_style": "text",
                     "needs_visual": True,
                     "visual_type": "diagram",
-                    "visual_prompt": f"Educational concept map diagram showing the main components and relationships in {topic}",
+                    "visual_prompt": f"Educational concept map diagram showing the main components and relationships in {topic}, with clear labels and arrows, suitable for young students",
                     "clear_board": False,
-                    "pause_after_ms": 500
+                    "pause_after_ms": 500,
+                    "complex_terms": []
                 }
             ],
             "key_formulas": [],
@@ -420,7 +430,7 @@ You MUST describe this visual naturally in your narration. Point to specific ele
 - Describe specific elements: "The sphere here represents...", "These arrows indicate...", "The blue area shows..."
 """
 
-        prompt = f"""You are a teacher explaining {topic}. Create natural spoken narration that combines:
+        prompt = f"""You are a friendly teacher explaining {topic} to young students (ages 10-12) who have never heard of this before.
 
 1. THE BOARD CONTENT (what's written):
 {board_content}
@@ -429,14 +439,16 @@ You MUST describe this visual naturally in your narration. Point to specific ele
 {base_text}
 {visual_section}
 
-Your narration should:
-- Sound like a real teacher speaking to a class
-- Be 4-6 sentences long
-- Flow naturally between explaining the board content and the visual (if any)
-- Use conversational language ("Now, let's look at...", "You can see here that...")
-- If there's a visual, describe its specific elements in detail
-- Make connections between the board text and the visual
-- Be engaging and clear
+IMPORTANT RULES:
+- Speak like you're talking to a child - use simple, everyday words
+- NO emojis in your speech
+- Explain EVERYTHING from basics - don't assume they know anything
+- Use analogies to everyday things kids understand (toys, games, food, school, etc.)
+- Be 5-8 sentences long for thorough explanation
+- When you use a difficult word, immediately explain it: "This is called X, which simply means..."
+- If there's a visual, describe EVERY part of it in detail
+- Make connections between concepts using simple cause-and-effect language
+- Sound enthusiastic but not over the top
 
 Return ONLY the narration text. No quotes, no formatting, just what the teacher would say."""
 
@@ -636,22 +648,25 @@ HAS IMAGE: {has_image}
 {f"Image importance: {image_info.get('importance', 'normal')}" if image_info else ""}
 {f"Image title: {image_info.get('title', '')}" if image_info else ""}
 
-Decide the optimal layout based on these rules:
-- If LOTS of text (>300 chars): use SMALL text, give text more space
+IMPORTANT: TEXT IS THE PRIORITY. Students need to read and learn from detailed text.
+Images are supplementary - they go in a SMALL gallery on the right side.
+
+Layout rules:
+- Text ALWAYS gets 75-85% of the board width
+- Images get 15-25% in a small gallery sidebar
+- If LOTS of text (>300 chars): use MEDIUM text size for more content
 - If LITTLE text (<100 chars): use LARGE text for emphasis
-- If image is "critical" importance: make image LARGE (60% of board)
-- If image is "supplementary": make image SMALL (30% of board)
-- If no image: text can use FULL width
-- Consider visual balance between text and image
+- Images are ALWAYS small in the gallery - students focus on text
+- If no image: text uses 100% width
 
 Return JSON with layout decisions:
 {{
   "text_size": "small" | "medium" | "large",
-  "text_width_percent": 40-100,
-  "image_size": "small" | "medium" | "large" | "none",
-  "image_width_percent": 0-60,
-  "image_position": "right" | "left" | "top" | "bottom" | "none",
-  "image_height_percent": 30-80,
+  "text_width_percent": 75-100,
+  "image_size": "small",
+  "image_width_percent": 15-25,
+  "image_position": "right",
+  "image_height_percent": 30-50,
   "line_spacing": "compact" | "normal" | "relaxed",
   "board_padding": "minimal" | "normal" | "spacious",
   "title_size": "normal" | "large" | "huge",
@@ -676,35 +691,20 @@ Return JSON with layout decisions:
             return self._default_layout(has_image, image_info)
     
     def _default_layout(self, has_image: bool, image_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Fallback layout when AI fails"""
+        """Fallback layout when AI fails - prioritize text"""
         if has_image:
-            importance = image_info.get("importance", "normal") if image_info else "normal"
-            if importance == "critical":
-                return {
-                    "text_size": "medium",
-                    "text_width_percent": 45,
-                    "image_size": "large",
-                    "image_width_percent": 55,
-                    "image_position": "right",
-                    "image_height_percent": 70,
-                    "line_spacing": "normal",
-                    "board_padding": "normal",
-                    "title_size": "large",
-                    "layout_reason": "Critical image gets prominence"
-                }
-            else:
-                return {
-                    "text_size": "medium",
-                    "text_width_percent": 60,
-                    "image_size": "medium",
-                    "image_width_percent": 40,
-                    "image_position": "right",
-                    "image_height_percent": 50,
-                    "line_spacing": "normal",
-                    "board_padding": "normal",
-                    "title_size": "normal",
-                    "layout_reason": "Balanced text and image"
-                }
+            return {
+                "text_size": "large",
+                "text_width_percent": 78,
+                "image_size": "small",
+                "image_width_percent": 22,
+                "image_position": "right",
+                "image_height_percent": 40,
+                "line_spacing": "normal",
+                "board_padding": "normal",
+                "title_size": "large",
+                "layout_reason": "Text-focused layout with small image gallery"
+            }
         else:
             return {
                 "text_size": "large",

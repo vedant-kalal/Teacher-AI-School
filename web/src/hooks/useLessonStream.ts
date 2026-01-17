@@ -50,6 +50,7 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
   const [boardState, setBoardState] = useState<BoardState>({
     lines: [],
     currentMedia: null,
+    mediaGallery: [],
     isClearing: false,
     layout: DEFAULT_LAYOUT,
   });
@@ -206,7 +207,11 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
         };
 
         if (media.display_on_board) {
-          setBoardState((prev) => ({ ...prev, currentMedia: media }));
+          setBoardState((prev) => ({
+            ...prev,
+            currentMedia: media,
+            mediaGallery: [...prev.mediaGallery.slice(-5), media],
+          }));
         }
 
         options.onMediaReady?.(media);
@@ -214,7 +219,7 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
       }
 
       case EventType.BOARD_CLEAR: {
-        setBoardState((prev) => ({ ...prev, isClearing: true, currentMedia: null }));
+        setBoardState((prev) => ({ ...prev, isClearing: true }));
         options.onBoardClear?.();
         
         setTimeout(() => {
@@ -260,11 +265,11 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
       case EventType.LAYOUT_UPDATE: {
         const newLayout: BoardLayout = {
           text_size: data.text_size || 'large',
-          text_width_percent: data.text_width_percent || 60,
-          image_size: data.image_size || 'large',
-          image_width_percent: data.image_width_percent || 40,
+          text_width_percent: data.text_width_percent || 78,
+          image_size: data.image_size || 'small',
+          image_width_percent: data.image_width_percent || 22,
           image_position: data.image_position || 'right',
-          image_height_percent: data.image_height_percent || 70,
+          image_height_percent: data.image_height_percent || 40,
           line_spacing: data.line_spacing || 'normal',
           board_padding: data.board_padding || 'normal',
           title_size: data.title_size || 'large',
@@ -290,6 +295,7 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
     setBoardState({
       lines: [],
       currentMedia: null,
+      mediaGallery: [],
       isClearing: false,
       layout: DEFAULT_LAYOUT,
     });

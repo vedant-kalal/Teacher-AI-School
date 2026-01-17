@@ -25,11 +25,11 @@ export default function StreamingBlackboard({
   const rawLayout = boardState.layout || DEFAULT_LAYOUT;
   const layout = {
     text_size: rawLayout.text_size || 'large',
-    text_width_percent: Math.min(100, Math.max(30, rawLayout.text_width_percent || 60)),
-    image_size: rawLayout.image_size || 'large',
-    image_width_percent: Math.min(70, Math.max(0, rawLayout.image_width_percent || 40)),
+    text_width_percent: Math.min(100, Math.max(75, rawLayout.text_width_percent || 78)),
+    image_size: rawLayout.image_size || 'small',
+    image_width_percent: Math.min(25, Math.max(0, rawLayout.image_width_percent || 22)),
     image_position: rawLayout.image_position || 'right',
-    image_height_percent: Math.min(90, Math.max(30, rawLayout.image_height_percent || 70)),
+    image_height_percent: Math.min(60, Math.max(20, rawLayout.image_height_percent || 40)),
     line_spacing: rawLayout.line_spacing || 'normal',
     board_padding: rawLayout.board_padding || 'normal',
     title_size: rawLayout.title_size || 'large',
@@ -139,19 +139,6 @@ export default function StreamingBlackboard({
     }
   };
 
-  const getImageMaxHeight = (heightPercent: number): string => {
-    return `${Math.max(200, heightPercent * 5)}px`;
-  };
-
-  const getImageMaxWidth = (size: string, widthPercent: number): string => {
-    switch (size) {
-      case 'small': return '200px';
-      case 'medium': return '350px';
-      case 'large': return `${Math.min(500, widthPercent * 8)}px`;
-      default: return '350px';
-    }
-  };
-
   const isWriting = currentlyWritingId !== null;
 
   return (
@@ -160,28 +147,28 @@ export default function StreamingBlackboard({
         <div className="board" style={{ padding: getPaddingRem(layout.board_padding) }}>
           {lessonStatus === 'idle' && (
             <div className="center-msg chalk-font">
-              <p style={{ fontSize: '2rem' }}>📚 Welcome to AI Teacher!</p>
-              <p style={{ fontSize: '1.5rem' }}>Enter a topic above to begin.</p>
+              <p style={{ fontSize: '2rem' }}>Welcome to AI Teacher</p>
+              <p style={{ fontSize: '1.5rem' }}>Enter a topic above to begin your lesson.</p>
             </div>
           )}
 
           {lessonStatus === 'starting' && (
             <div className="center-msg chalk-font">
-              <span style={{ fontSize: '1.8rem' }}>🎓 Preparing lesson on {topic}...</span>
+              <span style={{ fontSize: '1.8rem' }}>Preparing lesson on {topic}...</span>
               <div className="dots"><span></span><span></span><span></span></div>
             </div>
           )}
 
           {lessonStatus === 'error' && (
             <div className="center-msg chalk-font error">
-              <p style={{ fontSize: '1.8rem' }}>❌ Something went wrong. Please try again.</p>
+              <p style={{ fontSize: '1.8rem' }}>Something went wrong. Please try again.</p>
             </div>
           )}
 
           {(lessonStatus === 'running' || lessonStatus === 'completed' || lessonStatus === 'paused') && (
             <div className={`content ${clearAnimation ? 'clearing' : ''}`}>
               {(isWriting || isNarrating) && (
-                <div className="speaking">🔊 Speaking...</div>
+                <div className="speaking">Speaking...</div>
               )}
               
               {title && (
@@ -233,38 +220,39 @@ export default function StreamingBlackboard({
 
                   {lessonStatus === 'completed' && (
                     <div className="done chalk-font" style={{ fontSize: getTextSizeRem(layout.text_size) }}>
-                      ✅ Lesson Complete!
+                      Lesson Complete!
                     </div>
                   )}
                 </div>
 
-                {boardState.currentMedia && layout.image_position !== 'none' && (
+                {boardState.mediaGallery.length > 0 && layout.image_position !== 'none' && (
                   <div 
                     className="image-side"
                     style={{ 
                       flex: `0 0 ${layout.image_width_percent}%`,
-                      alignItems: layout.image_position === 'top' || layout.image_position === 'bottom' ? 'center' : 'flex-start',
+                      alignItems: 'flex-start',
                     }}
                   >
-                    {(boardState.currentMedia.image_base64 || boardState.currentMedia.image_url) && (
-                      <div className="img-box">
-                        <img
-                          src={
-                            boardState.currentMedia.image_base64
-                              ? `data:image/png;base64,${boardState.currentMedia.image_base64}`
-                              : boardState.currentMedia.image_url
-                          }
-                          alt={boardState.currentMedia.title}
-                          style={{
-                            maxWidth: getImageMaxWidth(layout.image_size, layout.image_width_percent),
-                            maxHeight: getImageMaxHeight(layout.image_height_percent),
-                          }}
-                        />
-                        <div className="img-label chalk-font" style={{ fontSize: '1.1rem' }}>
-                          {boardState.currentMedia.title}
-                        </div>
-                      </div>
-                    )}
+                    <div className="image-gallery">
+                      {boardState.mediaGallery.slice(-6).map((media, idx) => (
+                        (media.image_base64 || media.image_url) && (
+                          <div 
+                            key={`${media.title}-${idx}`} 
+                            className={`gallery-item ${idx === boardState.mediaGallery.length - 1 ? 'current' : ''}`}
+                          >
+                            <img
+                              src={
+                                media.image_base64
+                                  ? `data:image/png;base64,${media.image_base64}`
+                                  : media.image_url
+                              }
+                              alt={media.title}
+                            />
+                            <div className="img-label chalk-font">{media.title}</div>
+                          </div>
+                        )
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -484,36 +472,63 @@ export default function StreamingBlackboard({
 
         .image-side {
           display: flex;
-          justify-content: center;
+          justify-content: flex-start;
           flex-shrink: 0;
+          overflow-y: auto;
         }
 
-        .img-box {
-          background: rgba(255,255,255,0.1);
-          padding: 12px;
-          border-radius: 10px;
-          border: 2px solid rgba(255,255,255,0.2);
-          animation: fadeIn 0.5s ease-out;
+        .image-gallery {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 8px;
+          width: 100%;
+        }
+
+        .gallery-item {
+          background: rgba(255,255,255,0.08);
+          padding: 6px;
+          border-radius: 6px;
+          border: 1px solid rgba(255,255,255,0.15);
+          animation: fadeIn 0.4s ease-out;
           display: flex;
           flex-direction: column;
           align-items: center;
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.9); }
-          to { opacity: 1; transform: scale(1); }
+          opacity: 0.7;
+          transition: opacity 0.3s, transform 0.3s;
         }
 
-        .img-box img {
-          border-radius: 8px;
-          display: block;
+        .gallery-item.current {
+          opacity: 1;
+          border-color: #ffd700;
+          transform: scale(1.02);
+        }
+
+        .gallery-item img {
+          width: 100%;
+          max-height: 120px;
+          border-radius: 4px;
           object-fit: contain;
         }
 
-        .img-label {
-          margin-top: 10px;
-          color: #ffd700;
+        .gallery-item .img-label {
+          font-size: 0.75rem;
+          margin-top: 4px;
+          color: #ccc;
           text-align: center;
-          font-weight: 500;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .gallery-item.current .img-label {
+          color: #ffd700;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </div>
