@@ -127,7 +127,8 @@ curl -X POST http://localhost:5000/api/stream/lesson/start \
 - LLM: GPT-4o for visual planning, GPT-4o-mini for fast responses
 - Content: NO emojis, detailed explanations, complex terms explained simply
 - Blackboard: Full-screen, edge-to-edge board with dynamic layout per segment
-- Layout: Text gets 75-85% of board width, images in small gallery (15-25%)
-- Images: Small gallery on right side showing multiple images (up to 6)
-- Scrolling: Auto-scroll to new content as it appears
+- Layout: Text gets 60% of board width, images get 40% for visibility
+- Images: Large scrollable gallery on right side showing multiple images (up to 6), each image is big and readable
+- Board content: Must include definitions, descriptions, examples like a real teacher writes on a blackboard
+- Scrolling: Auto-scroll to new content as it appears, image section also scrollable
 - Narration: Speaking indicator shows during board writing, synced with text animation, explains each visual

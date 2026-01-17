@@ -114,11 +114,11 @@ export interface BoardLayout {
 
 export const DEFAULT_LAYOUT: BoardLayout = {
   text_size: 'large',
-  text_width_percent: 75,
-  image_size: 'small',
-  image_width_percent: 25,
+  text_width_percent: 60,
+  image_size: 'large',
+  image_width_percent: 40,
   image_position: 'right',
-  image_height_percent: 50,
+  image_height_percent: 70,
   line_spacing: 'normal',
   board_padding: 'normal',
   title_size: 'large',

@@ -265,11 +265,11 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
       case EventType.LAYOUT_UPDATE: {
         const newLayout: BoardLayout = {
           text_size: data.text_size || 'large',
-          text_width_percent: data.text_width_percent || 78,
-          image_size: data.image_size || 'small',
-          image_width_percent: data.image_width_percent || 22,
+          text_width_percent: data.text_width_percent || 60,
+          image_size: data.image_size || 'large',
+          image_width_percent: data.image_width_percent || 40,
           image_position: data.image_position || 'right',
-          image_height_percent: data.image_height_percent || 40,
+          image_height_percent: data.image_height_percent || 70,
           line_spacing: data.line_spacing || 'normal',
           board_padding: data.board_padding || 'normal',
           title_size: data.title_size || 'large',

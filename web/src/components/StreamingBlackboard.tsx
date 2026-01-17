@@ -25,11 +25,11 @@ export default function StreamingBlackboard({
   const rawLayout = boardState.layout || DEFAULT_LAYOUT;
   const layout = {
     text_size: rawLayout.text_size || 'large',
-    text_width_percent: Math.min(100, Math.max(75, rawLayout.text_width_percent || 78)),
-    image_size: rawLayout.image_size || 'small',
-    image_width_percent: Math.min(25, Math.max(0, rawLayout.image_width_percent || 22)),
+    text_width_percent: Math.min(70, Math.max(50, rawLayout.text_width_percent || 60)),
+    image_size: rawLayout.image_size || 'large',
+    image_width_percent: Math.min(50, Math.max(30, rawLayout.image_width_percent || 40)),
     image_position: rawLayout.image_position || 'right',
-    image_height_percent: Math.min(60, Math.max(20, rawLayout.image_height_percent || 40)),
+    image_height_percent: Math.min(90, Math.max(40, rawLayout.image_height_percent || 70)),
     line_spacing: rawLayout.line_spacing || 'normal',
     board_padding: rawLayout.board_padding || 'normal',
     title_size: rawLayout.title_size || 'large',
@@ -238,7 +238,7 @@ export default function StreamingBlackboard({
                         (media.image_base64 || media.image_url) && (
                           <div 
                             key={`${media.title}-${idx}`} 
-                            className={`gallery-item ${idx === boardState.mediaGallery.length - 1 ? 'current' : ''}`}
+                            className={`gallery-item ${idx === boardState.mediaGallery.slice(-6).length - 1 ? 'current' : ''}`}
                           >
                             <img
                               src={
@@ -475,55 +475,73 @@ export default function StreamingBlackboard({
           justify-content: flex-start;
           flex-shrink: 0;
           overflow-y: auto;
+          overflow-x: hidden;
+          height: 100%;
+        }
+
+        .image-side::-webkit-scrollbar {
+          width: 6px;
+        }
+        .image-side::-webkit-scrollbar-track {
+          background: rgba(255,255,255,0.1);
+          border-radius: 3px;
+        }
+        .image-side::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.3);
+          border-radius: 3px;
         }
 
         .image-gallery {
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          padding: 8px;
+          gap: 16px;
+          padding: 10px;
           width: 100%;
         }
 
         .gallery-item {
-          background: rgba(255,255,255,0.08);
-          padding: 6px;
-          border-radius: 6px;
-          border: 1px solid rgba(255,255,255,0.15);
+          background: rgba(255,255,255,0.1);
+          padding: 12px;
+          border-radius: 10px;
+          border: 2px solid rgba(255,255,255,0.2);
           animation: fadeIn 0.4s ease-out;
           display: flex;
           flex-direction: column;
           align-items: center;
-          opacity: 0.7;
-          transition: opacity 0.3s, transform 0.3s;
+          opacity: 0.85;
+          transition: opacity 0.3s, transform 0.3s, border-color 0.3s;
         }
 
         .gallery-item.current {
           opacity: 1;
           border-color: #ffd700;
-          transform: scale(1.02);
+          transform: scale(1.03);
+          box-shadow: 0 4px 20px rgba(255, 215, 0, 0.3);
         }
 
         .gallery-item img {
           width: 100%;
-          max-height: 120px;
-          border-radius: 4px;
+          max-height: 280px;
+          min-height: 150px;
+          border-radius: 8px;
           object-fit: contain;
+          background: rgba(0,0,0,0.2);
         }
 
         .gallery-item .img-label {
-          font-size: 0.75rem;
-          margin-top: 4px;
-          color: #ccc;
+          font-size: 1rem;
+          margin-top: 10px;
+          color: #fff;
           text-align: center;
           max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          line-height: 1.3;
+          word-wrap: break-word;
+          white-space: normal;
         }
 
         .gallery-item.current .img-label {
           color: #ffd700;
+          font-weight: 600;
         }
 
         @keyframes fadeIn {

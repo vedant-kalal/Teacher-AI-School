@@ -33,8 +33,8 @@ IMPORTANT: Teach like you are explaining to a 10-12 year old student who has nev
 Create a detailed lesson with 10-14 segments. Each segment should feel like a real teacher explaining in class with patience and clarity.
 
 For EACH segment, provide:
-1. narration_text: What the teacher says (3-5 sentences, simple words, explain every concept from basics, use analogies and real-life examples)
-2. board_text: What appears on the board (detailed content with multiple points, definitions, examples - make it comprehensive)
+1. narration_text: What the teacher says (4-6 sentences, simple words, explain every concept from basics, use analogies and real-life examples)
+2. board_text: What appears on the board - MUST include definitions, descriptions, and explanations like a real teacher writes
 3. board_style: "title", "heading", "text", "formula", "bullet", or "highlight"
 4. needs_visual: true if this segment needs a diagram or image (aim for 6-8 visuals per lesson)
 5. visual_type: "diagram", "image", "3d_model", or "video" (only if needs_visual is true)
@@ -42,14 +42,33 @@ For EACH segment, provide:
 7. clear_board: true if the board should be cleared before this segment
 8. complex_terms: List of difficult words/phrases in this segment that need simpler explanation
 
-Rules for board_text:
+CRITICAL Rules for board_text - Write like a REAL TEACHER on a blackboard:
 - NO markdown symbols (no #, *, **, `, etc.)
 - NO emojis - keep it professional and clean
 - Use proper mathematical symbols: × ÷ ² ³ √ π θ α β γ Δ Σ Ω → ← ≤ ≥ ≠ ∞ °
 - Use bullet points with • symbol
-- Write MORE content - at least 3-5 lines per segment
-- Include definitions, examples, and key points
-- Keep formulas clean and readable
+- Write 5-8 lines per segment minimum
+- ALWAYS include:
+  * DEFINITION: What is it? (simple explanation)
+  * DESCRIPTION: How does it work? What does it do?
+  * EXAMPLE: Real-world example the student can relate to
+  * KEY POINTS: Important things to remember
+- Use arrows (→) to show cause and effect
+- Underline or highlight key words using colons
+
+Example board_text format:
+"What is Photosynthesis?
+
+Definition: The process plants use to make their own food using sunlight.
+
+How it works:
+• Sunlight + Water + Carbon Dioxide → Sugar + Oxygen
+• Plants have special cells called chloroplasts
+• Chloroplasts contain chlorophyll (the green color)
+
+In simple words: Plants are like little factories that turn sunlight into food!
+
+Example: A tree in your backyard does this every day to grow bigger."
 
 Teaching style:
 - Start from absolute basics - assume the student knows nothing
@@ -59,6 +78,7 @@ Teaching style:
 - Give real-world examples students can relate to
 - Include multiple examples for each concept
 - Explain every technical term in simple words
+- Write definitions for every new term introduced
 
 Return ONLY valid JSON in this format:
 {{
