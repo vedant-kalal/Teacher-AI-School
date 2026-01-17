@@ -44,15 +44,23 @@ export default function StreamingBlackboard({
   useEffect(() => {
     if (boardState.isClearing) {
       setClearAnimation(true);
-      const timer = setTimeout(() => {
+      setTimeout(() => {
         setClearAnimation(false);
         setAnimatedLines(new Map());
         animatedLinesRef.current.clear();
         setCurrentlyWritingId(null);
       }, 600);
-      return () => clearTimeout(timer);
     }
   }, [boardState.isClearing]);
+
+  // Also clear animation refs when lines array is emptied
+  useEffect(() => {
+    if (boardState.lines.length === 0 && animatedLinesRef.current.size > 0) {
+      setAnimatedLines(new Map());
+      animatedLinesRef.current.clear();
+      setCurrentlyWritingId(null);
+    }
+  }, [boardState.lines.length]);
 
   const animateLine = useCallback((line: BoardLine) => {
     const cleanText = cleanTextForBoard(line.text);
