@@ -164,7 +164,6 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
         setBoardState((prev) => ({
           ...prev,
           lines: [...prev.lines, newLine],
-          currentMedia: null,
         }));
 
         animateText(writeEvent.text, writeEvent.char_delay_ms, () => {
