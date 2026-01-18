@@ -234,11 +234,11 @@ export default function StreamingBlackboard({
                     }}
                   >
                     <div className="image-gallery">
-                      {boardState.mediaGallery.slice(-6).map((media, idx) => (
+                      {[...boardState.mediaGallery].reverse().slice(0, 6).map((media, idx) => (
                         (media.image_base64 || media.image_url) && (
                           <div 
                             key={`${media.title}-${idx}`} 
-                            className={`gallery-item ${idx === boardState.mediaGallery.slice(-6).length - 1 ? 'current' : ''}`}
+                            className={`gallery-item ${idx === 0 ? 'current' : ''}`}
                           >
                             <img
                               src={
@@ -317,8 +317,9 @@ export default function StreamingBlackboard({
         .chalk-piece.blue { background: linear-gradient(#87ceeb, #6bb3d9); }
 
         .chalk-font {
-          font-family: 'Caveat', 'Segoe Script', cursive;
+          font-family: 'Patrick Hand', 'Caveat', 'Comic Sans MS', cursive;
           text-shadow: 0 0 4px rgba(255,255,255,0.25);
+          letter-spacing: 0.5px;
         }
 
         .center-msg {
@@ -395,7 +396,7 @@ export default function StreamingBlackboard({
         .layout {
           flex: 1;
           display: flex;
-          gap: 20px;
+          gap: 10px;
           overflow: hidden;
         }
 
@@ -500,8 +501,8 @@ export default function StreamingBlackboard({
         }
 
         .gallery-item {
-          background: rgba(255,255,255,0.1);
-          padding: 12px;
+          background: rgba(0,0,0,0.3);
+          padding: 8px;
           border-radius: 10px;
           border: 2px solid rgba(255,255,255,0.2);
           animation: fadeIn 0.4s ease-out;
@@ -521,10 +522,9 @@ export default function StreamingBlackboard({
 
         .gallery-item img {
           width: 100%;
-          max-height: 280px;
-          min-height: 150px;
+          height: 220px;
           border-radius: 8px;
-          object-fit: contain;
+          object-fit: cover;
           background: rgba(0,0,0,0.2);
         }
 

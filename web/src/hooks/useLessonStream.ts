@@ -226,6 +226,8 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
           setBoardState((prev) => ({
             ...prev,
             lines: [],
+            currentMedia: null,
+            mediaGallery: [],
             isClearing: false,
           }));
           setDisplayedText('');

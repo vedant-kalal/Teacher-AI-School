@@ -32,6 +32,13 @@ IMPORTANT: Teach like you are explaining to a 10-12 year old student who has nev
 
 Create a detailed lesson with 10-14 segments. Each segment should feel like a real teacher explaining in class with patience and clarity.
 
+CRITICAL: Make the teaching feel CONTINUOUS and NATURAL:
+- The first segment introduces the topic warmly
+- Middle segments FLOW NATURALLY with transitions like "Now that we understand X, let's explore Y..." or "Building on this..."
+- NEVER start a new segment like you're starting over (avoid "Today we will learn..." in the middle)
+- The LAST segment MUST be a proper CLOSING: "Thank you for learning with me today! Let me summarize what we covered..."
+- Each segment must teach something UNIQUE - no repetition allowed
+
 For EACH segment, provide:
 1. narration_text: What the teacher says (4-6 sentences, simple words, explain every concept from basics, use analogies and real-life examples)
 2. board_text: What appears on the board - MUST include definitions, descriptions, and explanations like a real teacher writes
@@ -99,7 +106,11 @@ Return ONLY valid JSON in this format:
     }}
   ],
   "key_formulas": ["E = mc²", "F = ma"],
-  "learning_objectives": ["Understand X", "Apply Y"]
+  "learning_objectives": ["Understand X", "Apply Y"],
+  "conclusion": {{
+    "summary_text": "Key points we learned today...",
+    "thank_you_message": "Thank you for learning with me! You now understand..."
+  }}
 }}"""
 
         try:
@@ -668,25 +679,25 @@ HAS IMAGE: {has_image}
 {f"Image importance: {image_info.get('importance', 'normal')}" if image_info else ""}
 {f"Image title: {image_info.get('title', '')}" if image_info else ""}
 
-IMPORTANT: TEXT IS THE PRIORITY. Students need to read and learn from detailed text.
-Images are supplementary - they go in a SMALL gallery on the right side.
+IMPORTANT: Both text AND images are important for students.
+Text explains the concept, images help visualize it.
 
 Layout rules:
-- Text ALWAYS gets 75-85% of the board width
-- Images get 15-25% in a small gallery sidebar
+- Text gets 55-65% of the board width (for detailed explanations)
+- Images get 35-45% of the board width (LARGE, visible, readable images)
 - If LOTS of text (>300 chars): use MEDIUM text size for more content
 - If LITTLE text (<100 chars): use LARGE text for emphasis
-- Images are ALWAYS small in the gallery - students focus on text
+- Images must be LARGE so students can see and understand them clearly
 - If no image: text uses 100% width
 
 Return JSON with layout decisions:
 {{
   "text_size": "small" | "medium" | "large",
-  "text_width_percent": 75-100,
-  "image_size": "small",
-  "image_width_percent": 15-25,
+  "text_width_percent": 55-65,
+  "image_size": "large",
+  "image_width_percent": 35-45,
   "image_position": "right",
-  "image_height_percent": 30-50,
+  "image_height_percent": 60-80,
   "line_spacing": "compact" | "normal" | "relaxed",
   "board_padding": "minimal" | "normal" | "spacious",
   "title_size": "normal" | "large" | "huge",
@@ -711,19 +722,19 @@ Return JSON with layout decisions:
             return self._default_layout(has_image, image_info)
     
     def _default_layout(self, has_image: bool, image_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Fallback layout when AI fails - prioritize text"""
+        """Fallback layout with balanced text and large images"""
         if has_image:
             return {
                 "text_size": "large",
-                "text_width_percent": 78,
-                "image_size": "small",
-                "image_width_percent": 22,
+                "text_width_percent": 60,
+                "image_size": "large",
+                "image_width_percent": 40,
                 "image_position": "right",
-                "image_height_percent": 40,
+                "image_height_percent": 70,
                 "line_spacing": "normal",
                 "board_padding": "normal",
                 "title_size": "large",
-                "layout_reason": "Text-focused layout with small image gallery"
+                "layout_reason": "Balanced layout with large readable images"
             }
         else:
             return {
@@ -770,6 +781,202 @@ Return JSON with layout decisions:
         return adjusted
 
 
+class ImageSourceAgent:
+    """
+    Decides whether to use a real image from the internet or AI-generated image.
+    Real images are better for: real photos of objects, people, places, scientific images
+    AI images are better for: diagrams, abstract concepts, custom illustrations
+    """
+    def __init__(self):
+        pass
+    
+    async def decide_image_source(
+        self,
+        visual_prompt: str,
+        visual_type: str,
+        topic: str
+    ) -> Dict[str, Any]:
+        llm = get_llm("gpt-4o-mini", 0.5)
+        
+        prompt = f"""You are an educational content expert deciding the best image source for teaching.
+
+Topic: {topic}
+Visual Type: {visual_type}
+Visual Description: {visual_prompt}
+
+Decide: Should this be a REAL image (from Google/internet) or AI-GENERATED image?
+
+REAL IMAGE (from internet) is better for:
+- Photos of real things: animals, planets, famous places, historical events
+- Scientific photographs: microscope images, space photos, nature
+- Real-world examples: real buildings, real food, real vehicles
+- Educational diagrams that already exist (anatomy charts, periodic table, maps)
+
+AI-GENERATED IMAGE is better for:
+- Custom diagrams showing a specific concept
+- Abstract visualizations (like showing how gravity works)
+- Imaginary or hypothetical scenarios
+- Step-by-step process illustrations
+- Custom infographics with specific labels
+
+Return JSON:
+{{
+  "source": "real" or "ai_generated",
+  "search_query": "Google search query for finding this image (only if source is real)",
+  "ai_prompt": "Prompt for AI image generation (only if source is ai_generated)",
+  "reason": "Brief explanation of why this source was chosen"
+}}"""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You decide optimal image sources for education. Return JSON only."),
+                HumanMessage(content=prompt)
+            ])
+            
+            content = response.content.strip()
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
+            result = json.loads(content)
+            print(f"[ImageSource] Decided: {result.get('source')} for {visual_type}")
+            return result
+        except Exception as e:
+            print(f"Error in image source agent: {e}")
+            return {
+                "source": "ai_generated",
+                "ai_prompt": visual_prompt,
+                "reason": "Fallback to AI generation"
+            }
+
+
+class UniqueContentAgent:
+    """
+    Ensures no teaching phase is repeated. Keeps track of what has been taught
+    and validates new content is unique.
+    """
+    def __init__(self):
+        self.taught_content: List[str] = []
+    
+    def reset(self):
+        self.taught_content = []
+    
+    async def validate_and_enhance_script(
+        self,
+        script: Dict[str, Any],
+        topic: str
+    ) -> Dict[str, Any]:
+        llm = get_llm("gpt-4o", 0.6)
+        
+        segments = script.get("segments", [])
+        segment_summaries = [f"Segment {i+1}: {seg.get('board_text', '')[:100]}" for i, seg in enumerate(segments)]
+        
+        prompt = f"""You are a content quality checker for educational lessons about "{topic}".
+
+Review these lesson segments and ensure:
+1. NO segment is repeated or very similar to another
+2. Each segment teaches something NEW and UNIQUE
+3. The flow is CONTINUOUS and NATURAL (not "Now let's start..." each time)
+4. Add smooth TRANSITIONS between segments (e.g., "Building on what we learned...", "Now that we understand X, let's see Y...")
+5. Add a proper CONCLUSION segment that says "Thank you for learning with me today! Remember the key points we covered..."
+
+Current segments:
+{chr(10).join(segment_summaries)}
+
+Previous taught content (must be different):
+{chr(10).join(self.taught_content[-5:]) if self.taught_content else "None yet"}
+
+Return JSON with:
+{{
+  "is_valid": true/false,
+  "issues": ["list of any duplicate/repeated content"],
+  "suggested_transitions": {{"seg_1": "transition text", "seg_2": "transition text"}},
+  "needs_conclusion": true/false,
+  "conclusion_text": "Proper thank you and summary if needed"
+}}"""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You ensure educational content is unique and flows naturally."),
+                HumanMessage(content=prompt)
+            ])
+            
+            content = response.content.strip()
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
+            result = json.loads(content)
+            
+            for seg in segments:
+                summary = seg.get('board_text', '')[:50]
+                if summary and summary not in self.taught_content:
+                    self.taught_content.append(summary)
+            
+            print(f"[UniqueContent] Valid: {result.get('is_valid')}, Issues: {len(result.get('issues', []))}")
+            return result
+        except Exception as e:
+            print(f"Error in unique content agent: {e}")
+            return {"is_valid": True, "issues": [], "suggested_transitions": {}, "needs_conclusion": False}
+
+
+class ImageAnalyzerAgent:
+    """
+    Analyzes image content to help the narration agent explain what's in the image.
+    """
+    def __init__(self):
+        pass
+    
+    async def analyze_image_for_teaching(
+        self,
+        image_prompt: str,
+        visual_type: str,
+        topic: str
+    ) -> Dict[str, Any]:
+        llm = get_llm("gpt-4o-mini", 0.6)
+        
+        prompt = f"""You are an expert at understanding educational images and helping teachers explain them.
+
+Topic: {topic}
+Image Type: {visual_type}
+Image Description: {image_prompt}
+
+Analyze what this image shows and provide teaching guidance:
+
+1. What are the KEY ELEMENTS a teacher should point out?
+2. What should students LOOK AT first?
+3. What LABELS or parts need explanation?
+4. How does this connect to the topic being taught?
+5. What QUESTIONS can the teacher ask about this image?
+
+Return JSON:
+{{
+  "key_elements": ["list of main things to notice"],
+  "teaching_points": ["specific things to explain about the image"],
+  "student_focus": "What students should look at first",
+  "connection_to_topic": "How this relates to what's being taught",
+  "suggested_questions": ["questions to ask students about the image"],
+  "explanation_script": "A 2-3 sentence script for explaining this image to students"
+}}"""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You analyze educational images for teaching purposes."),
+                HumanMessage(content=prompt)
+            ])
+            
+            content = response.content.strip()
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
+            return json.loads(content)
+        except Exception as e:
+            print(f"Error in image analyzer: {e}")
+            return {
+                "key_elements": [],
+                "teaching_points": [],
+                "explanation_script": f"Take a look at this {visual_type} about {topic}."
+            }
+
+
 script_planner = ScriptPlannerAgent()
 script_analyzer = ScriptAnalyzerAgent()
 visual_coordinator = VisualCoordinatorAgent()
@@ -778,3 +985,6 @@ narration_agent = NarrationAgent()
 board_writer = BoardWriterAgent()
 decider_agent = DeciderAgent()
 layout_agent = BoardLayoutAgent()
+image_source_agent = ImageSourceAgent()
+unique_content_agent = UniqueContentAgent()
+image_analyzer_agent = ImageAnalyzerAgent()

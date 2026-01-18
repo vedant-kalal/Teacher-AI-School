@@ -18,7 +18,8 @@ from schemas.events import (
 from streaming.lesson_streamer import LessonStreamer, create_streamer, get_streamer, remove_streamer
 from agents.teaching_agents import (
     script_planner, script_analyzer, visual_coordinator, visual_generator,
-    narration_agent, board_writer, decider_agent, layout_agent
+    narration_agent, board_writer, decider_agent, layout_agent,
+    image_source_agent, unique_content_agent, image_analyzer_agent
 )
 
 
@@ -104,10 +105,24 @@ async def run_streaming_lesson(run_id: str, topic: str):
         await streamer.emit_status_update("Planning lesson script...", 0.05)
         
         script = await script_planner.plan_lesson_script(topic)
-        title = script.get("title", f"📚 {topic}")
+        title = script.get("title", f"{topic}")
         segments = script.get("segments", [])
+        conclusion = script.get("conclusion", {})
         
         print(f"✅ Lesson script created with {len(segments)} segments")
+        
+        unique_content_agent.reset()
+        content_validation = await unique_content_agent.validate_and_enhance_script(script, topic)
+        if not content_validation.get("is_valid"):
+            print(f"⚠️ Content issues found: {content_validation.get('issues', [])}")
+        
+        if content_validation.get("needs_conclusion") and not conclusion:
+            conclusion = {
+                "summary_text": content_validation.get("conclusion_text", "Thank you for learning with me today!"),
+                "thank_you_message": "You now understand the key concepts we covered!"
+            }
+        
+        print(f"📝 Content validation: Valid={content_validation.get('is_valid')}")
         
         await streamer.emit_status_update("Analyzing script for visual content...", 0.1)
         
@@ -130,9 +145,21 @@ async def run_streaming_lesson(run_id: str, topic: str):
             
             enhanced = await visual_generator.generate_enhanced_prompt(visual, script, topic)
             
+            source_decision = await image_source_agent.decide_image_source(
+                enhanced.get("enhanced_prompt", visual.get("detailed_prompt", "")),
+                enhanced.get("visual_type", visual.get("visual_type", "image")),
+                topic
+            )
+            
+            image_analysis = await image_analyzer_agent.analyze_image_for_teaching(
+                enhanced.get("enhanced_prompt", visual.get("detailed_prompt", "")),
+                enhanced.get("visual_type", visual.get("visual_type", "image")),
+                topic
+            )
+            
             task = asyncio.create_task(
                 generate_image_async(
-                    enhanced.get("enhanced_prompt", visual.get("detailed_prompt", "")),
+                    source_decision.get("ai_prompt", enhanced.get("enhanced_prompt", visual.get("detailed_prompt", ""))),
                     topic,
                     enhanced.get("visual_type", visual.get("visual_type", "image"))
                 )
@@ -140,10 +167,12 @@ async def run_streaming_lesson(run_id: str, topic: str):
             visual_tasks[visual_id] = {
                 "task": task,
                 "info": visual,
-                "enhanced": enhanced
+                "enhanced": enhanced,
+                "source_decision": source_decision,
+                "image_analysis": image_analysis
             }
             
-            print(f"🚀 [Pre-Gen] Started generation for: {visual.get('title', visual_id)}")
+            print(f"🚀 [Pre-Gen] Started generation for: {visual.get('title', visual_id)} (Source: {source_decision.get('source', 'ai_generated')})")
         
         await streamer.emit_lesson_start(title)
         await asyncio.sleep(0.5)
@@ -244,30 +273,38 @@ async def run_streaming_lesson(run_id: str, topic: str):
                     if task.done():
                         result = task.result()
                         if result:
+                            image_analysis = task_info.get("image_analysis", {})
                             visual_to_display = {
                                 "info": visual_info,
                                 "result": result,
-                                "duration": coordination.get("display_duration_ms", 5000)
+                                "duration": coordination.get("display_duration_ms", 5000),
+                                "analysis": image_analysis
                             }
                             visual_context = {
                                 "title": visual_info.get("title", ""),
                                 "description": visual_info.get("detailed_prompt", ""),
-                                "visual_type": visual_info.get("visual_type", "image")
+                                "visual_type": visual_info.get("visual_type", "image"),
+                                "teaching_points": image_analysis.get("teaching_points", []),
+                                "explanation_script": image_analysis.get("explanation_script", "")
                             }
                             shown_visuals.append(visual_to_show)
                     else:
                         try:
                             result = await asyncio.wait_for(task, timeout=15)
                             if result:
+                                image_analysis = task_info.get("image_analysis", {})
                                 visual_to_display = {
                                     "info": visual_info,
                                     "result": result,
-                                    "duration": coordination.get("display_duration_ms", 5000)
+                                    "duration": coordination.get("display_duration_ms", 5000),
+                                    "analysis": image_analysis
                                 }
                                 visual_context = {
                                     "title": visual_info.get("title", ""),
                                     "description": visual_info.get("detailed_prompt", ""),
-                                    "visual_type": visual_info.get("visual_type", "image")
+                                    "visual_type": visual_info.get("visual_type", "image"),
+                                    "teaching_points": image_analysis.get("teaching_points", []),
+                                    "explanation_script": image_analysis.get("explanation_script", "")
                                 }
                                 shown_visuals.append(visual_to_show)
                         except asyncio.TimeoutError:
@@ -349,7 +386,35 @@ async def run_streaming_lesson(run_id: str, topic: str):
                 except Exception as e:
                     print(f"Error displaying remaining visual {v_id}: {e}")
         
-        summary = f"Lesson on '{topic}' complete! We covered {total_segments} key concepts with {len(shown_visuals)} visual aids."
+        if conclusion:
+            await streamer.emit_board_clear("fade")
+            await asyncio.sleep(0.6)
+            
+            conclusion_text = conclusion.get("summary_text", "Let me summarize what we learned today...")
+            thank_you = conclusion.get("thank_you_message", "Thank you for learning with me!")
+            
+            conclusion_board = f"Summary\n\n{conclusion_text}\n\n{thank_you}"
+            conclusion_event = BoardWriteEvent(
+                text=conclusion_board,
+                style=BoardWriteStyle.HIGHLIGHT,
+                color="yellow",
+                size="large",
+                char_delay_ms=40,
+                duration_ms=len(conclusion_board) * 40,
+                sync_with_narration=True
+            )
+            await streamer.emit_board_write(conclusion_event)
+            
+            conclusion_narration = NarrationSegment(
+                text=f"{conclusion_text} {thank_you}",
+                duration_ms=5000,
+                speed=0.9,
+                pause_after_ms=1000
+            )
+            await streamer.emit_narration_segment(conclusion_narration)
+            await asyncio.sleep(5)
+        
+        summary = f"Lesson on '{topic}' complete! We covered {total_segments} key concepts with {len(shown_visuals)} visual aids. Thank you for learning!"
         await streamer.emit_lesson_end(summary)
         
         print(f"\n{'='*60}")
