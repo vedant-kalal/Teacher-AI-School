@@ -21,22 +21,17 @@ The application uses a Python backend with LangGraph for lesson generation, with
 
 ### Multi-Agent System (`python_backend/agents/teaching_agents.py`)
 
-1. **ScriptPlannerAgent** - Creates comprehensive lesson scripts with 8-12 segments
+1. **ScriptPlannerAgent** - Creates comprehensive lesson scripts with 10-14 segments
 2. **ScriptAnalyzerAgent** - Pre-analyzes FULL script to plan all visuals (images, diagrams, 3D models, videos)
 3. **VisualCoordinatorAgent** - Decides optimal timing for each visual based on narration script
 4. **VisualGeneratorAgent** - Creates enhanced prompts with full script context for accurate generation
 5. **NarrationAgent** - Expands narration text for natural teacher speaking style
 6. **BoardWriterAgent** - Formats text for clean blackboard display (no markdown, proper symbols)
 7. **DeciderAgent** - Controls lesson pacing and board clearing decisions
-8. **BoardLayoutAgent** - **NEW** Intelligent layout controller that decides board structure per segment:
-   - `text_size`: small/medium/large - Font size based on content amount
-   - `image_size`: small/medium/large - Image dimensions based on importance
-   - `image_position`: left/right/top/bottom/none - Where to place the image
-   - `text_width_percent`: 30-100% - How much space text takes
-   - `image_width_percent`: 0-70% - How much space image takes
-   - `line_spacing`: compact/normal/relaxed - Space between lines
-   - `board_padding`: minimal/normal/spacious - Board edge padding
-   - `title_size`: normal/large/huge - Title font size
+8. **BoardLayoutAgent** - Intelligent layout controller that decides board structure per segment
+9. **ImageSourceAgent** - Decides whether to use real internet image or AI-generated
+10. **UniqueContentAgent** - Ensures no teaching phase is repeated, validates unique content
+11. **ImageAnalyzerAgent** - Analyzes image content to help explain what students should notice
 
 ### Visual Generation Flow
 
@@ -132,25 +127,3 @@ curl -X POST http://localhost:5000/api/stream/lesson/start \
 - Board content: Must include definitions, descriptions, examples like a real teacher writes on a blackboard
 - Scrolling: Auto-scroll to new content as it appears, image section also scrollable
 - Narration: Speaking indicator shows during board writing, synced with text animation, explains each visual
-
-### Multi-Agent System (`python_backend/agents/teaching_agents.py`)
-
-1. **ScriptPlannerAgent** - Creates comprehensive lesson scripts with 10-14 segments
-2. **ScriptAnalyzerAgent** - Pre-analyzes FULL script to plan all visuals (images, diagrams, 3D models, videos)
-3. **VisualCoordinatorAgent** - Decides optimal timing for each visual based on narration script
-4. **VisualGeneratorAgent** - Creates enhanced prompts with full script context for accurate generation
-5. **NarrationAgent** - Expands narration text for natural teacher speaking style
-6. **BoardWriterAgent** - Formats text for clean blackboard display (no markdown, proper symbols)
-7. **DeciderAgent** - Controls lesson pacing and board clearing decisions
-8. **BoardLayoutAgent** - Intelligent layout controller that decides board structure per segment:
-   - `text_size`: small/medium/large - Font size based on content amount
-   - `image_size`: small/medium/large - Image dimensions based on importance
-   - `image_position`: left/right/top/bottom/none - Where to place the image
-   - `text_width_percent`: 55-65% - How much space text takes
-   - `image_width_percent`: 35-45% - How much space image takes (LARGE images)
-   - `line_spacing`: compact/normal/relaxed - Space between lines
-   - `board_padding`: minimal/normal/spacious - Board edge padding
-   - `title_size`: normal/large/huge - Title font size
-9. **ImageSourceAgent** - **NEW** Decides whether to use real internet image or AI-generated
-10. **UniqueContentAgent** - **NEW** Ensures no teaching phase is repeated, validates unique content
-11. **ImageAnalyzerAgent** - **NEW** Analyzes image content to help explain what students should notice
