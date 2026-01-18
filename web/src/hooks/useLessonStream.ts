@@ -313,14 +313,22 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
           duration_ms: data.duration_ms || 0,
           is_hinglish: data.is_hinglish || false,
         };
-        setBoardState((prev) => ({ ...prev, currentVoice: voice }));
         
-        if (voice.audio_base64) {
+        if (voice.audio_base64 && voice.audio_base64.length > 100) {
+          setBoardState((prev) => ({ ...prev, currentVoice: voice }));
           const audio = new Audio(`data:audio/mpeg;base64,${voice.audio_base64}`);
           audio.onplay = () => setIsNarrating(true);
-          audio.onended = () => setIsNarrating(false);
-          audio.onerror = () => setIsNarrating(false);
+          audio.onended = () => {
+            setIsNarrating(false);
+            setBoardState((prev) => ({ ...prev, currentVoice: null }));
+          };
+          audio.onerror = () => {
+            setIsNarrating(false);
+            setBoardState((prev) => ({ ...prev, currentVoice: null }));
+            speakText(voice.text, 1.0);
+          };
           audio.play().catch(() => {
+            setBoardState((prev) => ({ ...prev, currentVoice: null }));
             speakText(voice.text, 1.0);
           });
         }

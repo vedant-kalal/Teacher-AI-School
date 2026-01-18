@@ -397,7 +397,14 @@ async def run_streaming_lesson(run_id: str, topic: str):
             
             voice_audio = None
             if ELEVENLABS_API_KEY:
+                print(f"🔊 [Voice] Attempting ElevenLabs voice generation for segment {idx+1}")
                 voice_audio = await generate_hinglish_voice(hinglish_narration, use_male_voice=True)
+                if voice_audio:
+                    print(f"🔊 [Voice] Successfully generated {len(voice_audio)} bytes of audio")
+                else:
+                    print(f"⚠️ [Voice] Failed to generate voice audio for segment {idx+1}")
+            else:
+                print(f"ℹ️ [Voice] ELEVENLABS_API_KEY not set, using browser TTS")
             
             words = len(hinglish_narration.split())
             narration_duration = int((words / 150) * 60 * 1000)
