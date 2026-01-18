@@ -1135,7 +1135,8 @@ Positions should fit a 600x400 canvas."""
 class HinglishNarrationAgent:
     """
     Converts English narration to Hinglish (Hindi-English mixed) like real Indian teachers speak.
-    Example: "Dekho bachcho, yeh engine kaise kaam karta hai - it converts fuel into power."
+    Uses DEVANAGARI script for Hindi words for proper TTS pronunciation.
+    Example: "देखो बच्चों, यह engine कैसे काम करता है - it converts fuel into power."
     """
     def __init__(self):
         pass
@@ -1150,41 +1151,49 @@ class HinglishNarrationAgent:
         
         prompt = f"""You are a friendly Indian teacher who speaks in HINGLISH (mixing Hindi and English naturally).
 
-Convert this English narration to Hinglish like a real Indian teacher speaks in class:
+Convert this English narration to Hinglish like a real Indian teacher speaks in class.
+
+CRITICAL: Write Hindi words in DEVANAGARI SCRIPT (हिंदी) for proper pronunciation by TTS.
+Keep English words in English script.
 
 Topic: {topic}
 Original text: {english_text}
 
 RULES for Hinglish:
 1. Mix Hindi and English NATURALLY - like how teachers actually speak
-2. Use Hindi for:
-   - Addressing students: "Dekho bachcho", "Samjhe?", "Theek hai?"
-   - Common expressions: "Yeh dekho", "Acha", "Bilkul", "Matlab ki"
-   - Encouragement: "Bahut accha!", "Sahi jawab!", "Shabash!"
-   - Questions: "Kya tumhe pata hai?", "Socho zara"
-3. Keep TECHNICAL TERMS in English (engine, photosynthesis, gravity, etc.)
-4. Use Hindi connecting words: "Toh", "Aur", "Lekin", "Kyunki", "Isliye"
-5. Add teacher expressions: "Dekho", "Samjho", "Yaad rakho", "Dhyan do"
-6. Keep it simple and warm like a classroom teacher
-7. Use Roman script for Hindi words (not Devanagari)
+2. Write Hindi words in DEVANAGARI (not Roman):
+   - "देखो बच्चों" (not "Dekho bachcho")
+   - "समझे?" (not "Samjhe?")
+   - "ठीक है?" (not "Theek hai?")
+   - "यह देखो" (not "Yeh dekho")
+   - "बहुत अच्छा!" (not "Bahut accha!")
+   - "क्या तुम्हें पता है?" (not "Kya tumhe pata hai?")
+3. Keep TECHNICAL TERMS in English (engine, photosynthesis, gravity, black hole, etc.)
+4. Keep COMMON ENGLISH words in English when natural (important, problem, example, etc.)
+5. Use Devanagari connecting words: "तो", "और", "लेकिन", "क्योंकि", "इसलिए"
+6. Add teacher expressions: "देखो", "समझो", "याद रखो", "ध्यान दो"
+7. Keep it simple and warm like a classroom teacher
 
 IMPORTANT: 
 - DO NOT use emojis
+- Write Hindi in DEVANAGARI script for correct pronunciation
 - Keep scientific/technical terms in English
 - Mix naturally, don't force Hindi where English sounds better
 - Sound like a real teacher, not a textbook
 
 Example conversions:
-- "Let me explain how this works" -> "Chalo, main tumhe samjhata hoon ki yeh kaise kaam karta hai"
-- "This is very important" -> "Yeh bahut important hai, dhyan se suno"
-- "Do you understand?" -> "Samajh aaya? Koi doubt hai toh pucho"
-- "The engine has three parts" -> "Dekho, engine ke teen parts hote hain"
+- "Let me explain how this works" -> "चलो, मैं तुम्हें समझाता हूं कि यह कैसे काम करता है"
+- "This is very important" -> "यह बहुत important है, ध्यान से सुनो"
+- "Do you understand?" -> "समझ आया? कोई doubt है तो पूछो"
+- "The engine has three parts" -> "देखो, engine के तीन parts होते हैं"
+- "A black hole is very powerful" -> "देखो बच्चों, black hole बहुत powerful होता है"
+- "Now let's learn about gravity" -> "अब चलो gravity के बारे में सीखते हैं"
 
-Return ONLY the Hinglish text, nothing else."""
+Return ONLY the Hinglish text with Hindi in Devanagari, nothing else."""
 
         try:
             response = await llm.ainvoke([
-                SystemMessage(content="You are an expert at natural Hinglish speaking like Indian teachers."),
+                SystemMessage(content="You are an expert at natural Hinglish speaking like Indian teachers. Write Hindi in Devanagari script."),
                 HumanMessage(content=prompt)
             ])
             

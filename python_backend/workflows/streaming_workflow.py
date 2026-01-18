@@ -22,10 +22,7 @@ from agents.teaching_agents import (
     image_source_agent, unique_content_agent, image_analyzer_agent,
     chalk_drawing_agent, hinglish_agent
 )
-from streaming.voice_service import generate_hinglish_voice
-
-ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
-
+from streaming.openai_voice_service import generate_hinglish_voice_openai
 
 OPENAI_BASE_URL = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
 OPENAI_API_KEY = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
@@ -396,15 +393,12 @@ async def run_streaming_lesson(run_id: str, topic: str):
             print(f"🗣️ [Hinglish] Converted narration for segment {idx+1}")
             
             voice_audio = None
-            if ELEVENLABS_API_KEY:
-                print(f"🔊 [Voice] Attempting ElevenLabs voice generation for segment {idx+1}")
-                voice_audio = await generate_hinglish_voice(hinglish_narration, use_male_voice=True)
-                if voice_audio:
-                    print(f"🔊 [Voice] Successfully generated {len(voice_audio)} bytes of audio")
-                else:
-                    print(f"⚠️ [Voice] Failed to generate voice audio for segment {idx+1}")
+            print(f"🔊 [Voice] Generating OpenAI voice for segment {idx+1}")
+            voice_audio = await generate_hinglish_voice_openai(hinglish_narration, use_male_voice=True)
+            if voice_audio:
+                print(f"🔊 [Voice] Successfully generated {len(voice_audio)} bytes of audio")
             else:
-                print(f"ℹ️ [Voice] ELEVENLABS_API_KEY not set, using browser TTS")
+                print(f"⚠️ [Voice] Failed to generate voice, will use browser TTS")
             
             words = len(hinglish_narration.split())
             narration_duration = int((words / 150) * 60 * 1000)
