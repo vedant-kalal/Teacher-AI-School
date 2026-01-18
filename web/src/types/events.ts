@@ -12,6 +12,8 @@ export enum EventType {
   ERROR = 'error',
   STATUS_UPDATE = 'status_update',
   LAYOUT_UPDATE = 'layout_update',
+  CHALK_DRAWING = 'chalk_drawing',
+  VOICE_AUDIO = 'voice_audio',
 }
 
 export enum MediaType {
@@ -124,12 +126,48 @@ export const DEFAULT_LAYOUT: BoardLayout = {
   title_size: 'large',
 };
 
+export interface ChalkDrawingStep {
+  step_id: number;
+  type: 'rect' | 'circle' | 'ellipse' | 'arrow' | 'line' | 'text' | 'curved_arrow';
+  x: number;
+  y: number;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  width?: number;
+  height?: number;
+  radius?: number;
+  label?: string;
+  text?: string;
+  delay_ms: number;
+  draw_duration_ms: number;
+}
+
+export interface ChalkDrawingEvent {
+  title: string;
+  drawing_type: string;
+  total_duration_ms: number;
+  steps: ChalkDrawingStep[];
+  explanation: string;
+}
+
+export interface VoiceAudioEvent {
+  audio_base64: string;
+  text: string;
+  duration_ms: number;
+  is_hinglish: boolean;
+}
+
 export interface BoardState {
   lines: BoardLine[];
   currentMedia: MediaReadyEvent | null;
   mediaGallery: MediaReadyEvent[];
   isClearing: boolean;
   layout: BoardLayout;
+  currentDrawing: ChalkDrawingEvent | null;
+  drawings: ChalkDrawingEvent[];
+  currentVoice: VoiceAudioEvent | null;
 }
 
 export interface BoardLine {

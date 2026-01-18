@@ -129,6 +129,27 @@ class LessonStreamer:
             "title_size": layout.get("title_size", "large"),
             "layout_reason": layout.get("layout_reason", "")
         })
+    
+    async def emit_chalk_drawing(self, drawing: dict):
+        """Emit a chalk drawing event for animated diagram drawing"""
+        await self.emit_event(EventType.CHALK_DRAWING, {
+            "title": drawing.get("title", ""),
+            "drawing_type": drawing.get("drawing_type", "diagram"),
+            "total_duration_ms": drawing.get("total_duration_ms", 8000),
+            "steps": drawing.get("steps", []),
+            "explanation": drawing.get("explanation", "")
+        })
+    
+    async def emit_voice_audio(self, audio_base64: str, text: str, is_hinglish: bool = False):
+        """Emit voice audio event with ElevenLabs generated audio"""
+        words = len(text.split())
+        duration_ms = int((words / 150) * 60 * 1000)
+        await self.emit_event(EventType.VOICE_AUDIO, {
+            "audio_base64": audio_base64,
+            "text": text,
+            "duration_ms": duration_ms,
+            "is_hinglish": is_hinglish
+        })
         
     async def get_events(self) -> AsyncGenerator[str, None]:
         self.is_running = True

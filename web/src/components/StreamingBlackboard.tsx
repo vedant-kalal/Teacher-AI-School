@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BoardState, BoardLine, BoardWriteStyle, cleanTextForBoard, DEFAULT_LAYOUT } from '../types/events';
+import ChalkDrawing from './ChalkDrawing';
 
 interface StreamingBlackboardProps {
   boardState: BoardState;
@@ -217,6 +218,17 @@ export default function StreamingBlackboard({
                       </div>
                     );
                   })}
+
+                  {boardState.currentDrawing && (
+                    <ChalkDrawing
+                      title={boardState.currentDrawing.title}
+                      drawingType={boardState.currentDrawing.drawing_type}
+                      steps={boardState.currentDrawing.steps}
+                      totalDuration={boardState.currentDrawing.total_duration_ms}
+                      explanation={boardState.currentDrawing.explanation}
+                      isActive={true}
+                    />
+                  )}
 
                   {lessonStatus === 'completed' && (
                     <div className="done chalk-font" style={{ fontSize: getTextSizeRem(layout.text_size) }}>
@@ -522,10 +534,13 @@ export default function StreamingBlackboard({
 
         .gallery-item img {
           width: 100%;
-          max-height: 280px;
+          height: auto;
+          max-height: 380px;
+          min-height: 150px;
           border-radius: 8px;
           object-fit: contain;
-          background: rgba(0,0,0,0.2);
+          object-position: center;
+          background: rgba(0,0,0,0.15);
         }
 
         .gallery-item .img-label {

@@ -977,6 +977,225 @@ Return JSON:
             }
 
 
+class ChalkDrawingAgent:
+    """
+    Decides when to draw diagrams, flowcharts, or visual explanations on the board with chalk animation.
+    This agent is for hand-drawn style diagrams that appear step-by-step.
+    """
+    def __init__(self):
+        pass
+    
+    async def analyze_for_drawings(
+        self,
+        segments: List[Dict[str, Any]],
+        topic: str
+    ) -> List[Dict[str, Any]]:
+        llm = get_llm("gpt-4o", 0.7)
+        
+        segment_list = "\n".join([
+            f"Segment {i+1}: {seg.get('narration_text', '')[:100]}..."
+            for i, seg in enumerate(segments)
+        ])
+        
+        prompt = f"""You are an expert teacher who knows when a HAND-DRAWN diagram on the blackboard helps students understand better.
+
+Topic: {topic}
+
+Analyze these lesson segments and decide WHERE to draw chalk diagrams:
+{segment_list}
+
+A chalk drawing is best for:
+- Flowcharts showing step-by-step processes
+- Simple diagrams showing relationships (arrows, boxes, circles)
+- Cycle diagrams (water cycle, life cycle, etc.)
+- Comparison tables or charts
+- Hierarchies or tree structures
+- Labeled parts of something
+- Timeline diagrams
+- Cause-effect chains (A -> B -> C)
+
+DO NOT use chalk drawing for:
+- Realistic images (use photographs instead)
+- Complex scientific images (use AI-generated images)
+- Text-only content
+
+Return 3-5 chalk drawings that would help teaching. Each drawing should be simple enough to draw step-by-step.
+
+Return JSON:
+{{
+  "drawings": [
+    {{
+      "segment_index": 2,
+      "drawing_type": "flowchart" | "diagram" | "cycle" | "comparison" | "hierarchy" | "labeled_parts" | "timeline" | "cause_effect",
+      "title": "How Engines Work",
+      "elements": [
+        {{"type": "box", "label": "Fuel Input", "position": "left"}},
+        {{"type": "arrow", "from": "Fuel Input", "to": "Combustion"}},
+        {{"type": "box", "label": "Combustion", "position": "center"}},
+        {{"type": "arrow", "from": "Combustion", "to": "Power Output"}},
+        {{"type": "box", "label": "Power Output", "position": "right"}}
+      ],
+      "explanation": "This shows the basic flow of how an engine converts fuel to power",
+      "draw_order": ["box:Fuel Input", "arrow:1", "box:Combustion", "arrow:2", "box:Power Output"]
+    }}
+  ]
+}}"""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You plan educational chalk drawings for blackboard teaching."),
+                HumanMessage(content=prompt)
+            ])
+            
+            content = response.content.strip()
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
+            result = json.loads(content)
+            print(f"[ChalkDrawing] Planned {len(result.get('drawings', []))} chalk drawings")
+            return result.get("drawings", [])
+        except Exception as e:
+            print(f"Error in chalk drawing agent: {e}")
+            return []
+    
+    async def generate_drawing_steps(
+        self,
+        drawing: Dict[str, Any],
+        topic: str
+    ) -> Dict[str, Any]:
+        llm = get_llm("gpt-4o-mini", 0.5)
+        
+        prompt = f"""Convert this drawing plan into step-by-step chalk drawing instructions.
+
+Topic: {topic}
+Drawing Type: {drawing.get('drawing_type', 'diagram')}
+Title: {drawing.get('title', '')}
+Elements: {json.dumps(drawing.get('elements', []))}
+
+Generate SVG-like drawing steps that can be animated on a blackboard.
+Each step should be a simple shape or line that appears one at a time.
+
+Return JSON:
+{{
+  "title": "{drawing.get('title', '')}",
+  "total_duration_ms": 8000,
+  "steps": [
+    {{
+      "step_id": 1,
+      "type": "rect",
+      "x": 50,
+      "y": 100,
+      "width": 120,
+      "height": 60,
+      "label": "Fuel Input",
+      "delay_ms": 0,
+      "draw_duration_ms": 800
+    }},
+    {{
+      "step_id": 2,
+      "type": "arrow",
+      "x1": 170,
+      "y1": 130,
+      "x2": 230,
+      "y2": 130,
+      "delay_ms": 1000,
+      "draw_duration_ms": 500
+    }},
+    {{
+      "step_id": 3,
+      "type": "text",
+      "x": 100,
+      "y": 250,
+      "text": "Step 1: Fuel enters",
+      "delay_ms": 1500,
+      "draw_duration_ms": 600
+    }}
+  ]
+}}
+
+Shape types: rect, circle, ellipse, arrow, line, text, curved_arrow
+Positions should fit a 600x400 canvas."""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You generate step-by-step drawing instructions for animated chalk diagrams."),
+                HumanMessage(content=prompt)
+            ])
+            
+            content = response.content.strip()
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
+            return json.loads(content)
+        except Exception as e:
+            print(f"Error generating drawing steps: {e}")
+            return {"title": drawing.get("title", ""), "steps": []}
+
+
+class HinglishNarrationAgent:
+    """
+    Converts English narration to Hinglish (Hindi-English mixed) like real Indian teachers speak.
+    Example: "Dekho bachcho, yeh engine kaise kaam karta hai - it converts fuel into power."
+    """
+    def __init__(self):
+        pass
+    
+    async def convert_to_hinglish(
+        self,
+        english_text: str,
+        topic: str,
+        formality: str = "friendly"
+    ) -> str:
+        llm = get_llm("gpt-4o", 0.8)
+        
+        prompt = f"""You are a friendly Indian teacher who speaks in HINGLISH (mixing Hindi and English naturally).
+
+Convert this English narration to Hinglish like a real Indian teacher speaks in class:
+
+Topic: {topic}
+Original text: {english_text}
+
+RULES for Hinglish:
+1. Mix Hindi and English NATURALLY - like how teachers actually speak
+2. Use Hindi for:
+   - Addressing students: "Dekho bachcho", "Samjhe?", "Theek hai?"
+   - Common expressions: "Yeh dekho", "Acha", "Bilkul", "Matlab ki"
+   - Encouragement: "Bahut accha!", "Sahi jawab!", "Shabash!"
+   - Questions: "Kya tumhe pata hai?", "Socho zara"
+3. Keep TECHNICAL TERMS in English (engine, photosynthesis, gravity, etc.)
+4. Use Hindi connecting words: "Toh", "Aur", "Lekin", "Kyunki", "Isliye"
+5. Add teacher expressions: "Dekho", "Samjho", "Yaad rakho", "Dhyan do"
+6. Keep it simple and warm like a classroom teacher
+7. Use Roman script for Hindi words (not Devanagari)
+
+IMPORTANT: 
+- DO NOT use emojis
+- Keep scientific/technical terms in English
+- Mix naturally, don't force Hindi where English sounds better
+- Sound like a real teacher, not a textbook
+
+Example conversions:
+- "Let me explain how this works" -> "Chalo, main tumhe samjhata hoon ki yeh kaise kaam karta hai"
+- "This is very important" -> "Yeh bahut important hai, dhyan se suno"
+- "Do you understand?" -> "Samajh aaya? Koi doubt hai toh pucho"
+- "The engine has three parts" -> "Dekho, engine ke teen parts hote hain"
+
+Return ONLY the Hinglish text, nothing else."""
+
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content="You are an expert at natural Hinglish speaking like Indian teachers."),
+                HumanMessage(content=prompt)
+            ])
+            
+            result = response.content.strip()
+            result = result.replace('**', '').replace('*', '')
+            return result
+        except Exception as e:
+            print(f"Error converting to Hinglish: {e}")
+            return english_text
+
+
 script_planner = ScriptPlannerAgent()
 script_analyzer = ScriptAnalyzerAgent()
 visual_coordinator = VisualCoordinatorAgent()
@@ -988,3 +1207,5 @@ layout_agent = BoardLayoutAgent()
 image_source_agent = ImageSourceAgent()
 unique_content_agent = UniqueContentAgent()
 image_analyzer_agent = ImageAnalyzerAgent()
+chalk_drawing_agent = ChalkDrawingAgent()
+hinglish_agent = HinglishNarrationAgent()

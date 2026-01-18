@@ -12,6 +12,8 @@ import {
   DEFAULT_LAYOUT,
   cleanTextForBoard,
   BoardWriteStyle,
+  ChalkDrawingEvent,
+  VoiceAudioEvent,
 } from '../types/events';
 
 interface UseLessonStreamOptions {
@@ -53,6 +55,9 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
     mediaGallery: [],
     isClearing: false,
     layout: DEFAULT_LAYOUT,
+    currentDrawing: null,
+    drawings: [],
+    currentVoice: null,
   });
 
   const [currentNarration, setCurrentNarration] = useState<NarrationSegment | null>(null);
@@ -190,7 +195,12 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
         };
 
         setCurrentNarration(narration);
-        speakText(narration.text, narration.speed);
+        setBoardState((prev) => {
+          if (!prev.currentVoice) {
+            speakText(narration.text, narration.speed);
+          }
+          return prev;
+        });
         options.onNarration?.(narration);
         break;
       }
@@ -279,6 +289,43 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
         setBoardState((prev) => ({ ...prev, layout: newLayout }));
         break;
       }
+
+      case EventType.CHALK_DRAWING: {
+        const drawing: ChalkDrawingEvent = {
+          title: data.title,
+          drawing_type: data.drawing_type,
+          total_duration_ms: data.total_duration_ms || 8000,
+          steps: data.steps || [],
+          explanation: data.explanation || '',
+        };
+        setBoardState((prev) => ({
+          ...prev,
+          currentDrawing: drawing,
+          drawings: [...prev.drawings, drawing],
+        }));
+        break;
+      }
+
+      case EventType.VOICE_AUDIO: {
+        const voice: VoiceAudioEvent = {
+          audio_base64: data.audio_base64,
+          text: data.text,
+          duration_ms: data.duration_ms || 0,
+          is_hinglish: data.is_hinglish || false,
+        };
+        setBoardState((prev) => ({ ...prev, currentVoice: voice }));
+        
+        if (voice.audio_base64) {
+          const audio = new Audio(`data:audio/mpeg;base64,${voice.audio_base64}`);
+          audio.onplay = () => setIsNarrating(true);
+          audio.onended = () => setIsNarrating(false);
+          audio.onerror = () => setIsNarrating(false);
+          audio.play().catch(() => {
+            speakText(voice.text, 1.0);
+          });
+        }
+        break;
+      }
     }
   }, [options, animateText, speakText]);
 
@@ -300,6 +347,9 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
       mediaGallery: [],
       isClearing: false,
       layout: DEFAULT_LAYOUT,
+      currentDrawing: null,
+      drawings: [],
+      currentVoice: null,
     });
 
     setDisplayedText('');

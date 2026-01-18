@@ -32,6 +32,8 @@ The application uses a Python backend with LangGraph for lesson generation, with
 9. **ImageSourceAgent** - Decides whether to use real internet image or AI-generated
 10. **UniqueContentAgent** - Ensures no teaching phase is repeated, validates unique content
 11. **ImageAnalyzerAgent** - Analyzes image content to help explain what students should notice
+12. **ChalkDrawingAgent** - Plans and generates step-by-step chalk drawings (flowcharts, diagrams, cycles)
+13. **HinglishNarrationAgent** - Converts English narration to Hinglish (Hindi-English mixed) like real Indian teachers
 
 ### Visual Generation Flow
 
@@ -101,7 +103,9 @@ GET /ui - Interactive blackboard interface
 - `board_clear` - Clear board animation
 - `narration_segment` - Text for speech synthesis
 - `media_ready` - Image/diagram ready to display
-- `layout_update` - **NEW** Dynamic layout configuration from BoardLayoutAgent
+- `layout_update` - Dynamic layout configuration from BoardLayoutAgent
+- `chalk_drawing` - Animated chalk drawings (flowcharts, diagrams) on board
+- `voice_audio` - ElevenLabs realistic voice narration (Hinglish)
 - `pause` - Pause between segments
 - `lesson_end` - Lesson complete with summary
 
@@ -123,7 +127,10 @@ curl -X POST http://localhost:5000/api/stream/lesson/start \
 - Content: NO emojis, detailed explanations, complex terms explained simply
 - Blackboard: Full-screen, edge-to-edge board with dynamic layout per segment
 - Layout: Text gets 60% of board width, images get 40% for visibility
-- Images: Large scrollable gallery on right side showing multiple images (up to 6), each image is big and readable
+- Images: Large scrollable gallery on right side showing multiple images (up to 6), each image is big and readable with object-fit: contain
 - Board content: Must include definitions, descriptions, examples like a real teacher writes on a blackboard
 - Scrolling: Auto-scroll to new content as it appears, image section also scrollable
-- Narration: Speaking indicator shows during board writing, synced with text animation, explains each visual
+- Narration: Hinglish (Hindi-English mixed) like real Indian teachers, with ElevenLabs voice if API key provided
+- Chalk drawings: Animated diagrams and flowcharts drawn step-by-step on the board
+- Voice: ElevenLabs multilingual model for realistic human voice (requires ELEVENLABS_API_KEY)
+- Real images: Pexels API for real photographs (requires PEXELS_API_KEY), falls back to AI-generated

@@ -22,6 +22,8 @@ class EventType(str, Enum):
     ERROR = "error"
     STATUS_UPDATE = "status_update"
     LAYOUT_UPDATE = "layout_update"
+    CHALK_DRAWING = "chalk_drawing"
+    VOICE_AUDIO = "voice_audio"
 
 
 class BoardLayoutConfig(BaseModel):
@@ -97,6 +99,39 @@ class MediaReadyEvent(BaseModel):
     image_url: Optional[str] = None
     display_on_board: bool = True
     display_duration_ms: int = 5000
+
+
+class ChalkDrawingStep(BaseModel):
+    step_id: int
+    type: str
+    x: float = 0
+    y: float = 0
+    x1: Optional[float] = None
+    y1: Optional[float] = None
+    x2: Optional[float] = None
+    y2: Optional[float] = None
+    width: Optional[float] = None
+    height: Optional[float] = None
+    radius: Optional[float] = None
+    label: Optional[str] = None
+    text: Optional[str] = None
+    delay_ms: int = 0
+    draw_duration_ms: int = 500
+
+
+class ChalkDrawingEvent(BaseModel):
+    title: str
+    drawing_type: str
+    total_duration_ms: int = 8000
+    steps: List[ChalkDrawingStep]
+    explanation: str = ""
+
+
+class VoiceAudioEvent(BaseModel):
+    audio_base64: str
+    text: str
+    duration_ms: int = 0
+    is_hinglish: bool = False
 
 
 class LessonStreamEvent(BaseModel):

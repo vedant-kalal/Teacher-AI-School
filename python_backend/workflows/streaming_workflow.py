@@ -19,8 +19,12 @@ from streaming.lesson_streamer import LessonStreamer, create_streamer, get_strea
 from agents.teaching_agents import (
     script_planner, script_analyzer, visual_coordinator, visual_generator,
     narration_agent, board_writer, decider_agent, layout_agent,
-    image_source_agent, unique_content_agent, image_analyzer_agent
+    image_source_agent, unique_content_agent, image_analyzer_agent,
+    chalk_drawing_agent, hinglish_agent
 )
+from streaming.voice_service import generate_hinglish_voice
+
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
 
 
 OPENAI_BASE_URL = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
@@ -174,6 +178,23 @@ async def run_streaming_lesson(run_id: str, topic: str):
         
         print(f"📊 Visual plan: {len(visual_plan)} visuals planned")
         print(f"📝 Visual strategy: {visual_plan_result.get('visual_summary', 'N/A')}")
+        
+        await streamer.emit_status_update("Planning chalk drawings...", 0.12)
+        
+        chalk_drawings = await chalk_drawing_agent.analyze_for_drawings(segments, topic)
+        chalk_drawing_tasks = {}
+        for drawing in chalk_drawings:
+            segment_idx = drawing.get("segment_index", 1) - 1
+            if segment_idx < 0:
+                segment_idx = 0
+            if segment_idx not in chalk_drawing_tasks:
+                chalk_drawing_tasks[segment_idx] = []
+            task = asyncio.create_task(
+                chalk_drawing_agent.generate_drawing_steps(drawing, topic)
+            )
+            chalk_drawing_tasks[segment_idx].append({"drawing": drawing, "task": task})
+        
+        print(f"✏️ [ChalkDrawing] Planned {len(chalk_drawings)} drawings for segments")
         
         await streamer.emit_status_update("Pre-generating visual content...", 0.15)
         
@@ -371,17 +392,43 @@ async def run_streaming_lesson(run_id: str, topic: str):
                 visual_context
             )
             
-            words = len(expanded_narration.split())
+            hinglish_narration = await hinglish_agent.convert_to_hinglish(expanded_narration, topic)
+            print(f"🗣️ [Hinglish] Converted narration for segment {idx+1}")
+            
+            voice_audio = None
+            if ELEVENLABS_API_KEY:
+                voice_audio = await generate_hinglish_voice(hinglish_narration, use_male_voice=True)
+            
+            words = len(hinglish_narration.split())
             narration_duration = int((words / 150) * 60 * 1000)
             
             narration_segment = NarrationSegment(
-                text=expanded_narration,
+                text=hinglish_narration,
                 duration_ms=narration_duration,
                 speed=1.0 if pacing == "normal" else (0.9 if pacing == "slow" else 1.1),
                 pause_after_ms=segment.get("pause_after_ms", 500)
             )
             
             await streamer.emit_board_write(board_event)
+            
+            if idx in chalk_drawing_tasks:
+                for drawing_item in chalk_drawing_tasks[idx]:
+                    try:
+                        drawing_task = drawing_item["task"]
+                        if drawing_task.done():
+                            drawing_steps = drawing_task.result()
+                        else:
+                            drawing_steps = await asyncio.wait_for(drawing_task, timeout=10)
+                        
+                        if drawing_steps and drawing_steps.get("steps"):
+                            await streamer.emit_chalk_drawing(drawing_steps)
+                            print(f"✏️ [ChalkDrawing] Emitted: {drawing_steps.get('title', 'Drawing')}")
+                    except Exception as e:
+                        print(f"⚠️ [ChalkDrawing] Error: {e}")
+            
+            if voice_audio:
+                await streamer.emit_voice_audio(voice_audio, hinglish_narration, is_hinglish=True)
+                print(f"🎤 [Voice] Emitted ElevenLabs audio for segment {idx+1}")
             
             if visual_to_display:
                 visual_info = visual_to_display["info"]
