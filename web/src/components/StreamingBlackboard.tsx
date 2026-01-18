@@ -522,9 +522,9 @@ export default function StreamingBlackboard({
 
         .gallery-item img {
           width: 100%;
-          height: 220px;
+          max-height: 280px;
           border-radius: 8px;
-          object-fit: cover;
+          object-fit: contain;
           background: rgba(0,0,0,0.2);
         }
 

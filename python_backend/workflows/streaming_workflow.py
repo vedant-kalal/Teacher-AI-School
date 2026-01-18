@@ -25,6 +25,7 @@ from agents.teaching_agents import (
 
 OPENAI_BASE_URL = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
 OPENAI_API_KEY = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
+PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
 
 
 def get_media_type(visual_type: str) -> MediaType:
@@ -35,6 +36,48 @@ def get_media_type(visual_type: str) -> MediaType:
         "video": MediaType.VIDEO
     }
     return type_map.get(visual_type, MediaType.IMAGE)
+
+
+async def search_real_image(query: str, count: int = 1) -> List[Dict[str, Any]]:
+    """Search for real images from Pexels API"""
+    if not PEXELS_API_KEY:
+        print(f"⚠️ [Real Image] No Pexels API key, falling back to AI")
+        return []
+    
+    print(f"🔍 [Real Image] Searching Pexels for: {query}")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                "https://api.pexels.com/v1/search",
+                params={
+                    "query": query,
+                    "per_page": min(count, 5),
+                    "orientation": "landscape"
+                },
+                headers={
+                    "Authorization": PEXELS_API_KEY
+                }
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                photos = data.get("photos", [])
+                results = []
+                for photo in photos[:count]:
+                    results.append({
+                        "image_url": photo.get("src", {}).get("large2x") or photo.get("src", {}).get("large"),
+                        "title": photo.get("alt", query),
+                        "source": "pexels",
+                        "photographer": photo.get("photographer", "")
+                    })
+                print(f"✅ [Real Image] Found {len(results)} images from Pexels")
+                return results
+            else:
+                print(f"❌ [Real Image] Pexels error: {response.status_code}")
+                return []
+    except Exception as e:
+        print(f"❌ [Real Image] Search error: {e}")
+        return []
 
 
 async def generate_image_async(prompt: str, topic: str, visual_type: str = "image") -> Optional[Dict[str, Any]]:
@@ -157,22 +200,33 @@ async def run_streaming_lesson(run_id: str, topic: str):
                 topic
             )
             
-            task = asyncio.create_task(
-                generate_image_async(
-                    source_decision.get("ai_prompt", enhanced.get("enhanced_prompt", visual.get("detailed_prompt", ""))),
-                    topic,
-                    enhanced.get("visual_type", visual.get("visual_type", "image"))
-                )
-            )
+            image_source = source_decision.get("source", "ai_generated")
+            ai_prompt = source_decision.get("ai_prompt", enhanced.get("enhanced_prompt", visual.get("detailed_prompt", "")))
+            visual_type = enhanced.get("visual_type", visual.get("visual_type", "image"))
+            
+            async def get_images_with_fallback():
+                if image_source == "real" and PEXELS_API_KEY:
+                    search_query = source_decision.get("search_query", visual.get("title", topic))
+                    real_images = await search_real_image(search_query, count=2)
+                    if real_images:
+                        return real_images
+                    print(f"⚠️ [Fallback] No real images found, using AI generation")
+                
+                result = await generate_image_async(ai_prompt, topic, visual_type)
+                return [result] if result else []
+            
+            task = asyncio.create_task(get_images_with_fallback())
+            
             visual_tasks[visual_id] = {
                 "task": task,
                 "info": visual,
                 "enhanced": enhanced,
                 "source_decision": source_decision,
-                "image_analysis": image_analysis
+                "image_analysis": image_analysis,
+                "is_real": image_source == "real"
             }
             
-            print(f"🚀 [Pre-Gen] Started generation for: {visual.get('title', visual_id)} (Source: {source_decision.get('source', 'ai_generated')})")
+            print(f"🚀 [Pre-Gen] Started generation for: {visual.get('title', visual_id)} (Source: {image_source})")
         
         await streamer.emit_lesson_start(title)
         await asyncio.sleep(0.5)
@@ -331,18 +385,31 @@ async def run_streaming_lesson(run_id: str, topic: str):
             
             if visual_to_display:
                 visual_info = visual_to_display["info"]
-                result = visual_to_display["result"]
-                media = MediaReadyEvent(
-                    media_type=get_media_type(visual_info.get("visual_type", "image")),
-                    title=visual_info.get("title", "Visual"),
-                    description=visual_info.get("detailed_prompt", "")[:100],
-                    image_base64=result.get("image_base64"),
-                    image_url=result.get("image_url"),
-                    display_on_board=True,
-                    display_duration_ms=visual_to_display["duration"]
-                )
-                await streamer.emit_media_ready(media)
-                print(f"📸 [Visual] Displayed: {visual_info.get('title', 'Visual')}")
+                results = visual_to_display["result"]
+                
+                if not isinstance(results, list):
+                    results = [results]
+                
+                for idx_img, result in enumerate(results):
+                    if not result:
+                        continue
+                    is_real = result.get("source") == "pexels"
+                    title_suffix = f" (Photo by {result.get('photographer', 'Pexels')})" if is_real and result.get("photographer") else ""
+                    img_title = result.get("title") if is_real else visual_info.get("title", "Visual")
+                    if idx_img > 0:
+                        img_title = f"{img_title} ({idx_img + 1})"
+                    
+                    media = MediaReadyEvent(
+                        media_type=get_media_type(visual_info.get("visual_type", "image")),
+                        title=f"{img_title}{title_suffix}",
+                        description=visual_info.get("detailed_prompt", "")[:100],
+                        image_base64=result.get("image_base64"),
+                        image_url=result.get("image_url"),
+                        display_on_board=True,
+                        display_duration_ms=visual_to_display["duration"]
+                    )
+                    await streamer.emit_media_ready(media)
+                    print(f"📸 [Visual] Displayed: {img_title} (Real: {is_real})")
             
             await streamer.emit_narration_segment(narration_segment)
             
