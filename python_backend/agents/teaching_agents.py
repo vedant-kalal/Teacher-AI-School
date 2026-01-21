@@ -979,8 +979,8 @@ Return JSON:
 
 class ChalkDrawingAgent:
     """
-    Decides when to draw diagrams, flowcharts, or visual explanations on the board with chalk animation.
-    This agent is for hand-drawn style diagrams that appear step-by-step.
+    Creates REAL, DETAILED chalk drawings on the blackboard.
+    Generates complete SVG artwork that looks like hand-drawn illustrations.
     """
     def __init__(self):
         pass
@@ -993,57 +993,50 @@ class ChalkDrawingAgent:
         llm = get_llm("gpt-4o", 0.7)
         
         segment_list = "\n".join([
-            f"Segment {i+1}: {seg.get('narration_text', '')[:100]}..."
+            f"Segment {i+1}: {seg.get('narration_text', '')[:150]}..."
             for i, seg in enumerate(segments)
         ])
         
-        prompt = f"""You are an expert teacher who knows when a HAND-DRAWN diagram on the blackboard helps students understand better.
+        prompt = f"""You are an EXPERT ARTIST and TEACHER who creates DETAILED, BEAUTIFUL chalk drawings on blackboards.
 
 Topic: {topic}
 
-Analyze these lesson segments and decide WHERE to draw chalk diagrams:
+Analyze these lesson segments and plan DETAILED chalk drawings:
 {segment_list}
 
-A chalk drawing is best for:
-- Flowcharts showing step-by-step processes
-- Simple diagrams showing relationships (arrows, boxes, circles)
-- Cycle diagrams (water cycle, life cycle, etc.)
-- Comparison tables or charts
-- Hierarchies or tree structures
-- Labeled parts of something
-- Timeline diagrams
-- Cause-effect chains (A -> B -> C)
+Create 2-4 DETAILED chalk drawings. Each drawing should be REALISTIC and EDUCATIONAL:
+- For biology: Draw actual organisms, cells, organs with realistic details
+- For science: Draw detailed equipment, experiments, natural phenomena  
+- For math: Draw geometric constructions, graphs with proper axes
+- For history: Draw maps, timelines, important objects/scenes
+- For nature: Draw actual plants, animals, landscapes with details
 
-DO NOT use chalk drawing for:
-- Realistic images (use photographs instead)
-- Complex scientific images (use AI-generated images)
-- Text-only content
-
-Return 3-5 chalk drawings that would help teaching. Each drawing should be simple enough to draw step-by-step.
+Each drawing should include:
+1. Main subject drawn with realistic proportions
+2. Important parts labeled clearly
+3. Details that help understanding
 
 Return JSON:
 {{
   "drawings": [
     {{
       "segment_index": 2,
-      "drawing_type": "flowchart" | "diagram" | "cycle" | "comparison" | "hierarchy" | "labeled_parts" | "timeline" | "cause_effect",
-      "title": "How Engines Work",
-      "elements": [
-        {{"type": "box", "label": "Fuel Input", "position": "left"}},
-        {{"type": "arrow", "from": "Fuel Input", "to": "Combustion"}},
-        {{"type": "box", "label": "Combustion", "position": "center"}},
-        {{"type": "arrow", "from": "Combustion", "to": "Power Output"}},
-        {{"type": "box", "label": "Power Output", "position": "right"}}
-      ],
-      "explanation": "This shows the basic flow of how an engine converts fuel to power",
-      "draw_order": ["box:Fuel Input", "arrow:1", "box:Combustion", "arrow:2", "box:Power Output"]
+      "drawing_type": "detailed_illustration",
+      "title": "Structure of a Plant Cell",
+      "subject": "A detailed cross-section of a plant cell showing nucleus, chloroplasts, cell wall, vacuole",
+      "key_parts": ["nucleus", "chloroplast", "cell wall", "vacuole", "cell membrane"],
+      "style": "scientific_diagram",
+      "explanation": "This shows all the important parts inside a plant cell"
     }}
   ]
-}}"""
+}}
+
+Drawing types: detailed_illustration, scientific_diagram, labeled_anatomy, process_flow, comparison_chart, realistic_sketch
+Style: scientific_diagram, artistic_sketch, technical_drawing, educational_poster"""
 
         try:
             response = await llm.ainvoke([
-                SystemMessage(content="You plan educational chalk drawings for blackboard teaching."),
+                SystemMessage(content="You plan detailed educational chalk illustrations for blackboard teaching. Create drawings that look like REAL artwork, not simple shapes."),
                 HumanMessage(content=prompt)
             ])
             
@@ -1052,7 +1045,7 @@ Return JSON:
             content = re.sub(r'\s*```$', '', content)
             
             result = json.loads(content)
-            print(f"[ChalkDrawing] Planned {len(result.get('drawings', []))} chalk drawings")
+            print(f"[ChalkDrawing] Planned {len(result.get('drawings', []))} detailed drawings")
             return result.get("drawings", [])
         except Exception as e:
             print(f"Error in chalk drawing agent: {e}")
@@ -1063,62 +1056,86 @@ Return JSON:
         drawing: Dict[str, Any],
         topic: str
     ) -> Dict[str, Any]:
-        llm = get_llm("gpt-4o-mini", 0.5)
+        llm = get_llm("gpt-4o", 0.7)
         
-        prompt = f"""Convert this drawing plan into step-by-step chalk drawing instructions.
+        subject = drawing.get('subject', drawing.get('title', 'diagram'))
+        key_parts = drawing.get('key_parts', [])
+        style = drawing.get('style', 'educational')
+        
+        prompt = f"""You are a MASTER ARTIST creating a DETAILED chalk drawing for a blackboard.
 
 Topic: {topic}
-Drawing Type: {drawing.get('drawing_type', 'diagram')}
-Title: {drawing.get('title', '')}
-Elements: {json.dumps(drawing.get('elements', []))}
+Subject to Draw: {subject}
+Key Parts to Show: {', '.join(key_parts) if key_parts else 'Main features'}
+Style: {style}
 
-Generate SVG-like drawing steps that can be animated on a blackboard.
-Each step should be a simple shape or line that appears one at a time.
+Create a DETAILED SVG drawing with realistic shapes using PATH elements.
+The drawing should look like actual chalk art on a blackboard - detailed, beautiful, educational.
+
+IMPORTANT: Use SVG path elements with 'd' attribute for complex shapes.
+- Use M (move), L (line), C (curve), Q (quadratic curve), A (arc), Z (close)
+- Create smooth, natural curves that look hand-drawn
+- Add texture and detail to make it realistic
+
+Canvas size: 600 x 400 pixels
+Use white (#ffffff) or light colors for chalk effect.
 
 Return JSON:
 {{
   "title": "{drawing.get('title', '')}",
-  "total_duration_ms": 8000,
+  "drawing_type": "{drawing.get('drawing_type', 'detailed_illustration')}",
+  "total_duration_ms": 12000,
+  "explanation": "{drawing.get('explanation', '')}",
   "steps": [
     {{
       "step_id": 1,
-      "type": "rect",
-      "x": 50,
-      "y": 100,
-      "width": 120,
-      "height": 60,
-      "label": "Fuel Input",
+      "type": "path",
+      "d": "M 100 200 C 120 150 180 150 200 200 C 220 250 180 280 150 280 C 120 280 80 250 100 200",
+      "stroke": "#ffffff",
+      "fill": "none",
+      "strokeWidth": 2,
       "delay_ms": 0,
-      "draw_duration_ms": 800
+      "draw_duration_ms": 1500,
+      "description": "Main outline"
     }},
     {{
       "step_id": 2,
-      "type": "arrow",
-      "x1": 170,
-      "y1": 130,
-      "x2": 230,
-      "y2": 130,
-      "delay_ms": 1000,
-      "draw_duration_ms": 500
+      "type": "path", 
+      "d": "M 140 220 Q 150 210 160 220 Q 170 230 160 240 Q 150 250 140 240 Q 130 230 140 220",
+      "stroke": "#ffffff",
+      "fill": "none",
+      "strokeWidth": 1.5,
+      "delay_ms": 1500,
+      "draw_duration_ms": 1000,
+      "description": "Inner detail"
     }},
     {{
       "step_id": 3,
-      "type": "text",
-      "x": 100,
-      "y": 250,
-      "text": "Step 1: Fuel enters",
-      "delay_ms": 1500,
-      "draw_duration_ms": 600
+      "type": "label",
+      "x": 250,
+      "y": 220,
+      "text": "Nucleus",
+      "lineToX": 150,
+      "lineToY": 230,
+      "delay_ms": 2500,
+      "draw_duration_ms": 800
     }}
   ]
 }}
 
-Shape types: rect, circle, ellipse, arrow, line, text, curved_arrow
-Positions should fit a 600x400 canvas."""
+Step types available:
+- "path": SVG path with 'd' attribute for complex shapes (USE THIS MOST)
+- "label": Text label with optional leader line (lineToX, lineToY)
+- "text": Simple text without leader line
+- "circle": For simple circles (x, y, radius)
+- "group": Collection of related paths
+
+Create 8-15 steps to build up a DETAILED drawing.
+Make it look like real chalk art, not basic shapes!"""
 
         try:
             response = await llm.ainvoke([
-                SystemMessage(content="You generate step-by-step drawing instructions for animated chalk diagrams."),
+                SystemMessage(content="You are a master SVG artist. Create detailed, realistic chalk drawings using SVG path elements. Your drawings should look like actual illustrations, not simple geometric shapes."),
                 HumanMessage(content=prompt)
             ])
             

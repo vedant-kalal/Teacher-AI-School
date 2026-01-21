@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 
 interface DrawingStep {
   step_id: number;
-  type: 'rect' | 'circle' | 'ellipse' | 'arrow' | 'line' | 'text' | 'curved_arrow';
-  x: number;
-  y: number;
+  type: 'path' | 'label' | 'text' | 'circle' | 'rect' | 'arrow' | 'line' | 'ellipse' | 'group';
+  d?: string;
+  x?: number;
+  y?: number;
   x1?: number;
   y1?: number;
   x2?: number;
@@ -14,8 +15,15 @@ interface DrawingStep {
   radius?: number;
   label?: string;
   text?: string;
+  stroke?: string;
+  fill?: string;
+  strokeWidth?: number;
+  lineToX?: number;
+  lineToY?: number;
+  description?: string;
   delay_ms: number;
   draw_duration_ms: number;
+  paths?: DrawingStep[];
 }
 
 interface ChalkDrawingProps {
@@ -37,7 +45,9 @@ export default function ChalkDrawing({
 }: ChalkDrawingProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
   const [drawnSteps, setDrawnSteps] = useState<number[]>([]);
+  const [animatingSteps, setAnimatingSteps] = useState<Set<number>>(new Set());
   const svgRef = useRef<SVGSVGElement>(null);
+  const pathRefs = useRef<Map<number, SVGPathElement>>(new Map());
   
   void drawingType;
   void totalDuration;
@@ -47,15 +57,35 @@ export default function ChalkDrawing({
     
     setCurrentStepIndex(-1);
     setDrawnSteps([]);
+    setAnimatingSteps(new Set());
+    pathRefs.current.clear();
     
     let timeouts: NodeJS.Timeout[] = [];
     
     steps.forEach((step, idx) => {
-      const timeout = setTimeout(() => {
+      const startTimeout = setTimeout(() => {
         setCurrentStepIndex(idx);
+        setAnimatingSteps(prev => new Set(prev).add(step.step_id));
         setDrawnSteps(prev => [...prev, step.step_id]);
+        
+        const pathEl = pathRefs.current.get(step.step_id);
+        if (pathEl && step.type === 'path') {
+          const length = pathEl.getTotalLength();
+          pathEl.style.strokeDasharray = `${length}`;
+          pathEl.style.strokeDashoffset = `${length}`;
+          pathEl.style.animation = `chalk-path-draw ${step.draw_duration_ms}ms ease-out forwards`;
+        }
       }, step.delay_ms);
-      timeouts.push(timeout);
+      
+      const endTimeout = setTimeout(() => {
+        setAnimatingSteps(prev => {
+          const next = new Set(prev);
+          next.delete(step.step_id);
+          return next;
+        });
+      }, step.delay_ms + step.draw_duration_ms);
+      
+      timeouts.push(startTimeout, endTimeout);
     });
     
     return () => {
@@ -64,33 +94,111 @@ export default function ChalkDrawing({
   }, [isActive, steps]);
 
   const renderStep = (step: DrawingStep, isDrawing: boolean) => {
-    const animationClass = isDrawing ? 'drawing' : 'drawn';
-    const strokeColor = '#ffffff';
-    const strokeWidth = 3;
+    const strokeColor = step.stroke || '#ffffff';
+    const fillColor = step.fill || 'none';
+    const strokeWidth = step.strokeWidth || 2;
+    const animClass = isDrawing ? 'chalk-animating' : 'chalk-drawn';
     
     switch (step.type) {
-      case 'rect':
+      case 'path':
         return (
-          <g key={step.step_id} className={`chalk-step ${animationClass}`}>
-            <rect
-              x={step.x}
-              y={step.y}
-              width={step.width || 100}
-              height={step.height || 50}
-              fill="none"
+          <g key={step.step_id} className={`chalk-step ${animClass}`}>
+            <path
+              ref={(el) => { if (el) pathRefs.current.set(step.step_id, el); }}
+              d={step.d || ''}
+              fill={fillColor}
               stroke={strokeColor}
               strokeWidth={strokeWidth}
-              strokeDasharray={isDrawing ? "5,5" : "none"}
-              className="chalk-stroke"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="chalk-path"
+              style={{
+                filter: 'url(#chalk-glow)',
+              }}
+            />
+            {step.description && step.x !== undefined && step.y !== undefined && (
+              <text
+                x={step.x}
+                y={step.y}
+                fill="rgba(255,255,255,0.6)"
+                fontSize="10"
+                className="step-description"
+              >
+                {step.description}
+              </text>
+            )}
+          </g>
+        );
+      
+      case 'label':
+        const labelX = step.x || 0;
+        const labelY = step.y || 0;
+        return (
+          <g key={step.step_id} className={`chalk-step ${animClass}`}>
+            {step.lineToX !== undefined && step.lineToY !== undefined && (
+              <line
+                x1={labelX}
+                y1={labelY}
+                x2={step.lineToX}
+                y2={step.lineToY}
+                stroke={strokeColor}
+                strokeWidth={1}
+                strokeDasharray="4,4"
+                className="label-line"
+                style={{ filter: 'url(#chalk-glow)' }}
+              />
+            )}
+            <text
+              x={labelX}
+              y={labelY}
+              fill={strokeColor}
+              fontSize="14"
+              fontFamily="'Patrick Hand', 'Comic Sans MS', cursive"
+              className="chalk-label"
+              style={{ filter: 'url(#chalk-glow)' }}
+            >
+              {step.text || step.label || ''}
+            </text>
+          </g>
+        );
+      
+      case 'text':
+        return (
+          <text
+            key={step.step_id}
+            x={step.x || 0}
+            y={step.y || 0}
+            fill={strokeColor}
+            fontSize="14"
+            fontFamily="'Patrick Hand', 'Comic Sans MS', cursive"
+            className={`chalk-step chalk-text ${animClass}`}
+            style={{ filter: 'url(#chalk-glow)' }}
+          >
+            {step.text || step.label || ''}
+          </text>
+        );
+      
+      case 'circle':
+        return (
+          <g key={step.step_id} className={`chalk-step ${animClass}`}>
+            <circle
+              cx={step.x || 0}
+              cy={step.y || 0}
+              r={step.radius || 30}
+              fill={fillColor}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              className="chalk-circle"
+              style={{ filter: 'url(#chalk-glow)' }}
             />
             {step.label && (
               <text
-                x={step.x + (step.width || 100) / 2}
-                y={step.y + (step.height || 50) / 2 + 5}
+                x={step.x}
+                y={(step.y || 0) + 5}
                 textAnchor="middle"
                 fill={strokeColor}
-                className="chalk-text"
-                fontSize="14"
+                fontSize="12"
+                fontFamily="'Patrick Hand', cursive"
               >
                 {step.label}
               </text>
@@ -98,26 +206,30 @@ export default function ChalkDrawing({
           </g>
         );
       
-      case 'circle':
+      case 'rect':
         return (
-          <g key={step.step_id} className={`chalk-step ${animationClass}`}>
-            <circle
-              cx={step.x}
-              cy={step.y}
-              r={step.radius || 30}
-              fill="none"
+          <g key={step.step_id} className={`chalk-step ${animClass}`}>
+            <rect
+              x={step.x || 0}
+              y={step.y || 0}
+              width={step.width || 100}
+              height={step.height || 50}
+              fill={fillColor}
               stroke={strokeColor}
               strokeWidth={strokeWidth}
-              className="chalk-stroke"
+              rx={4}
+              ry={4}
+              className="chalk-rect"
+              style={{ filter: 'url(#chalk-glow)' }}
             />
             {step.label && (
               <text
-                x={step.x}
-                y={step.y + 5}
+                x={(step.x || 0) + (step.width || 100) / 2}
+                y={(step.y || 0) + (step.height || 50) / 2 + 5}
                 textAnchor="middle"
                 fill={strokeColor}
-                className="chalk-text"
                 fontSize="12"
+                fontFamily="'Patrick Hand', cursive"
               >
                 {step.label}
               </text>
@@ -127,13 +239,12 @@ export default function ChalkDrawing({
       
       case 'arrow':
       case 'line':
-        const x1 = step.x1 ?? step.x;
-        const y1 = step.y1 ?? step.y;
-        const x2 = step.x2 ?? step.x + 50;
-        const y2 = step.y2 ?? step.y;
-        
+        const x1 = step.x1 ?? step.x ?? 0;
+        const y1 = step.y1 ?? step.y ?? 0;
+        const x2 = step.x2 ?? (step.x || 0) + 50;
+        const y2 = step.y2 ?? step.y ?? 0;
         return (
-          <g key={step.step_id} className={`chalk-step ${animationClass}`}>
+          <g key={step.step_id} className={`chalk-step ${animClass}`}>
             <line
               x1={x1}
               y1={y1}
@@ -141,51 +252,47 @@ export default function ChalkDrawing({
               y2={y2}
               stroke={strokeColor}
               strokeWidth={strokeWidth}
-              className="chalk-stroke"
-              markerEnd={step.type === 'arrow' ? 'url(#arrowhead)' : undefined}
+              strokeLinecap="round"
+              markerEnd={step.type === 'arrow' ? 'url(#chalk-arrow)' : undefined}
+              className="chalk-line"
+              style={{ filter: 'url(#chalk-glow)' }}
             />
           </g>
         );
       
-      case 'text':
-        return (
-          <text
-            key={step.step_id}
-            x={step.x}
-            y={step.y}
-            fill={strokeColor}
-            className={`chalk-step chalk-text ${animationClass}`}
-            fontSize="14"
-          >
-            {step.text || step.label || ''}
-          </text>
-        );
-      
       case 'ellipse':
         return (
-          <g key={step.step_id} className={`chalk-step ${animationClass}`}>
+          <g key={step.step_id} className={`chalk-step ${animClass}`}>
             <ellipse
-              cx={step.x}
-              cy={step.y}
+              cx={step.x || 0}
+              cy={step.y || 0}
               rx={step.width || 50}
               ry={step.height || 30}
-              fill="none"
+              fill={fillColor}
               stroke={strokeColor}
               strokeWidth={strokeWidth}
-              className="chalk-stroke"
+              className="chalk-ellipse"
+              style={{ filter: 'url(#chalk-glow)' }}
             />
             {step.label && (
               <text
                 x={step.x}
-                y={step.y + 5}
+                y={(step.y || 0) + 5}
                 textAnchor="middle"
                 fill={strokeColor}
-                className="chalk-text"
                 fontSize="12"
+                fontFamily="'Patrick Hand', cursive"
               >
                 {step.label}
               </text>
             )}
+          </g>
+        );
+      
+      case 'group':
+        return (
+          <g key={step.step_id} className={`chalk-step ${animClass}`}>
+            {step.paths?.map((subPath, i) => renderStep({ ...subPath, step_id: step.step_id * 1000 + i }, false))}
           </g>
         );
       
@@ -207,25 +314,34 @@ export default function ChalkDrawing({
       >
         <defs>
           <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
-            refX="9"
-            refY="3.5"
+            id="chalk-arrow"
+            markerWidth="12"
+            markerHeight="8"
+            refX="10"
+            refY="4"
             orient="auto"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#ffffff" />
+            <polygon points="0 0, 12 4, 0 8" fill="#ffffff" opacity="0.9" />
           </marker>
-          <filter id="chalk-texture">
-            <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise" />
-            <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" />
+          
+          <filter id="chalk-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="0.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          
+          <filter id="chalk-texture" x="-5%" y="-5%" width="110%" height="110%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="4" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.5" />
           </filter>
         </defs>
         
         {steps.map((step, idx) => {
           if (!drawnSteps.includes(step.step_id)) return null;
-          const isCurrentlyDrawing = currentStepIndex === idx;
-          return renderStep(step, isCurrentlyDrawing);
+          const isCurrentlyAnimating = animatingSteps.has(step.step_id);
+          return renderStep(step, isCurrentlyAnimating);
         })}
       </svg>
       {explanation && (
@@ -234,83 +350,78 @@ export default function ChalkDrawing({
       
       <style>{`
         .chalk-drawing-container {
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 12px;
-          padding: 16px;
-          margin: 12px 0;
-          border: 2px solid rgba(255, 255, 255, 0.15);
+          background: rgba(20, 40, 30, 0.6);
+          border-radius: 16px;
+          padding: 20px;
+          margin: 16px 0;
+          border: 3px solid rgba(255, 255, 255, 0.2);
+          box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
         }
         
         .drawing-title {
           text-align: center;
-          color: #ffd700;
-          font-size: 1.3rem;
-          margin-bottom: 12px;
+          color: #ffd54f;
+          font-size: 1.4rem;
+          margin-bottom: 16px;
           font-weight: 600;
+          text-shadow: 0 0 8px rgba(255, 213, 79, 0.4);
+          letter-spacing: 1px;
         }
         
         .chalk-canvas {
           width: 100%;
           height: auto;
-          min-height: 200px;
-          max-height: 350px;
+          min-height: 250px;
+          max-height: 400px;
+          background: rgba(0, 0, 0, 0.15);
+          border-radius: 8px;
         }
         
         .chalk-step {
           opacity: 0;
-          animation: chalk-appear 0.5s ease-out forwards;
         }
         
-        .chalk-step.drawing {
-          animation: chalk-draw 0.8s ease-out forwards;
-        }
-        
-        .chalk-step.drawn {
+        .chalk-step.chalk-animating,
+        .chalk-step.chalk-drawn {
           opacity: 1;
+          animation: chalk-fade-in 0.3s ease-out forwards;
         }
         
-        .chalk-stroke {
+        .chalk-path {
           stroke-linecap: round;
           stroke-linejoin: round;
-          filter: url(#chalk-texture);
         }
         
-        .chalk-text {
-          font-family: 'Patrick Hand', 'Comic Sans MS', cursive;
-          text-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
+        .chalk-label, .chalk-text {
+          text-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+        }
+        
+        .label-line {
+          opacity: 0.7;
         }
         
         .drawing-explanation {
           text-align: center;
-          color: rgba(255, 255, 255, 0.8);
-          font-size: 1rem;
-          margin-top: 12px;
-          padding: 8px;
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 6px;
+          color: rgba(255, 255, 255, 0.85);
+          font-size: 1.05rem;
+          margin-top: 16px;
+          padding: 12px 16px;
+          background: rgba(0, 0, 0, 0.25);
+          border-radius: 8px;
+          line-height: 1.5;
         }
         
-        @keyframes chalk-appear {
+        @keyframes chalk-fade-in {
           from {
             opacity: 0;
-            transform: scale(0.8);
           }
           to {
             opacity: 1;
-            transform: scale(1);
           }
         }
         
-        @keyframes chalk-draw {
-          0% {
-            opacity: 0;
-            stroke-dashoffset: 1000;
-          }
-          50% {
-            opacity: 0.7;
-          }
-          100% {
-            opacity: 1;
+        @keyframes chalk-path-draw {
+          to {
             stroke-dashoffset: 0;
           }
         }
