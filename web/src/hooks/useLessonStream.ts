@@ -294,6 +294,11 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
         const drawing: ChalkDrawingEvent = {
           title: data.title,
           drawing_type: data.drawing_type,
+          is_generated_image: data.is_generated_image || false,
+          image_base64: data.image_base64 || '',
+          mime_type: data.mime_type || 'image/png',
+          key_parts: data.key_parts || [],
+          label_positions: data.label_positions || [],
           total_duration_ms: data.total_duration_ms || 8000,
           steps: data.steps || [],
           explanation: data.explanation || '',

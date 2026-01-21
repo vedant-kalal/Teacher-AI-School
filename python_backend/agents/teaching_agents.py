@@ -979,8 +979,8 @@ Return JSON:
 
 class ChalkDrawingAgent:
     """
-    Creates REAL, DETAILED chalk drawings on the blackboard.
-    Generates complete SVG artwork that looks like hand-drawn illustrations.
+    Creates REAL, DETAILED chalk drawings using Gemini's nano banana image generation.
+    Generates actual chalk-style diagram images that look like real blackboard drawings.
     """
     def __init__(self):
         pass
@@ -997,46 +997,46 @@ class ChalkDrawingAgent:
             for i, seg in enumerate(segments)
         ])
         
-        prompt = f"""You are an EXPERT ARTIST and TEACHER who creates DETAILED, BEAUTIFUL chalk drawings on blackboards.
+        prompt = f"""You are an EXPERT TEACHER who knows exactly what diagrams help students understand concepts.
 
 Topic: {topic}
 
-Analyze these lesson segments and plan DETAILED chalk drawings:
+Analyze these lesson segments and plan DETAILED chalk diagrams that will be GENERATED AS IMAGES:
 {segment_list}
 
-Create 2-4 DETAILED chalk drawings. Each drawing should be REALISTIC and EDUCATIONAL:
-- For biology: Draw actual organisms, cells, organs with realistic details
-- For science: Draw detailed equipment, experiments, natural phenomena  
-- For math: Draw geometric constructions, graphs with proper axes
-- For history: Draw maps, timelines, important objects/scenes
-- For nature: Draw actual plants, animals, landscapes with details
+Create 2-3 DETAILED educational diagrams. For each diagram, provide:
+1. A very detailed subject description (what exactly to draw)
+2. All important parts that should be labeled
+3. The style of diagram
 
-Each drawing should include:
-1. Main subject drawn with realistic proportions
-2. Important parts labeled clearly
-3. Details that help understanding
+IMPORTANT: Be EXTREMELY DETAILED in the 'subject' field because it will be used to generate an actual image.
+Include specific details like:
+- Exact components/parts to show
+- How they should be arranged
+- What details are most important
+- Any cross-sections, cutaways, or specific views needed
 
 Return JSON:
 {{
   "drawings": [
     {{
       "segment_index": 2,
-      "drawing_type": "detailed_illustration",
-      "title": "Structure of a Plant Cell",
-      "subject": "A detailed cross-section of a plant cell showing nucleus, chloroplasts, cell wall, vacuole",
-      "key_parts": ["nucleus", "chloroplast", "cell wall", "vacuole", "cell membrane"],
-      "style": "scientific_diagram",
-      "explanation": "This shows all the important parts inside a plant cell"
+      "drawing_type": "anatomical_diagram",
+      "title": "Structure of the Human Heart",
+      "subject": "A detailed cross-sectional view of a human heart showing all four chambers clearly visible. The right atrium and right ventricle on the right side, left atrium and left ventricle on the left side. Include the thick muscular walls of the ventricles. Show the aorta emerging from the top left, pulmonary artery from the top right. Include tricuspid valve between right chambers and mitral valve between left chambers. Draw arrows showing blood flow direction through each chamber.",
+      "key_parts": ["Right Atrium", "Left Atrium", "Right Ventricle", "Left Ventricle", "Aorta", "Pulmonary Artery", "Tricuspid Valve", "Mitral Valve"],
+      "style": "scientific_cross_section",
+      "explanation": "This diagram shows how blood flows through the four chambers of the heart"
     }}
   ]
 }}
 
-Drawing types: detailed_illustration, scientific_diagram, labeled_anatomy, process_flow, comparison_chart, realistic_sketch
-Style: scientific_diagram, artistic_sketch, technical_drawing, educational_poster"""
+Drawing types: anatomical_diagram, scientific_diagram, process_flowchart, labeled_parts, comparison_diagram, cycle_diagram, structure_diagram
+Style: scientific_cross_section, labeled_illustration, step_by_step, comparative_view"""
 
         try:
             response = await llm.ainvoke([
-                SystemMessage(content="You plan detailed educational chalk illustrations for blackboard teaching. Create drawings that look like REAL artwork, not simple shapes."),
+                SystemMessage(content="You plan detailed educational diagrams. The 'subject' field must be extremely detailed because it will be used to generate an actual image. Include every important detail that should be visible in the diagram."),
                 HumanMessage(content=prompt)
             ])
             
@@ -1045,17 +1045,70 @@ Style: scientific_diagram, artistic_sketch, technical_drawing, educational_poste
             content = re.sub(r'\s*```$', '', content)
             
             result = json.loads(content)
-            print(f"[ChalkDrawing] Planned {len(result.get('drawings', []))} detailed drawings")
+            print(f"[ChalkDrawing] Planned {len(result.get('drawings', []))} detailed diagrams for Gemini generation")
             return result.get("drawings", [])
         except Exception as e:
             print(f"Error in chalk drawing agent: {e}")
             return []
+    
+    async def generate_chalk_image(
+        self,
+        drawing: Dict[str, Any],
+        topic: str
+    ) -> Optional[Dict[str, Any]]:
+        """Generate a chalk diagram image using Gemini nano banana model"""
+        from python_backend.streaming.gemini_chalk_generator import generate_chalk_diagram_with_labels
+        
+        subject = drawing.get('subject', drawing.get('title', 'diagram'))
+        key_parts = drawing.get('key_parts', [])
+        explanation = drawing.get('explanation', '')
+        title = drawing.get('title', topic)
+        
+        print(f"🎨 [ChalkDrawing] Generating chalk image: {title}")
+        
+        result = await generate_chalk_diagram_with_labels(
+            subject=subject,
+            topic=topic,
+            key_parts=key_parts,
+            explanation=explanation
+        )
+        
+        if result:
+            result["title"] = title
+            result["drawing_type"] = drawing.get("drawing_type", "diagram")
+            result["segment_index"] = drawing.get("segment_index", 0)
+            print(f"✅ [ChalkDrawing] Generated chalk image: {title}")
+            return result
+        else:
+            print(f"⚠️ [ChalkDrawing] Failed to generate: {title}")
+            return None
     
     async def generate_drawing_steps(
         self,
         drawing: Dict[str, Any],
         topic: str
     ) -> Dict[str, Any]:
+        """Legacy method - now generates chalk images instead of SVG steps"""
+        result = await self.generate_chalk_image(drawing, topic)
+        if result:
+            return {
+                "title": result.get("title", drawing.get("title", "")),
+                "drawing_type": result.get("drawing_type", "chalk_image"),
+                "is_generated_image": True,
+                "image_base64": result.get("image_base64", ""),
+                "mime_type": result.get("mime_type", "image/png"),
+                "key_parts": result.get("key_parts", []),
+                "explanation": result.get("explanation", drawing.get("explanation", "")),
+                "label_positions": result.get("label_positions", [])
+            }
+        return {"title": drawing.get("title", ""), "steps": [], "is_generated_image": False}
+    
+    def _legacy_generate_drawing_steps(
+        self,
+        drawing: Dict[str, Any],
+        topic: str
+    ) -> Dict[str, Any]:
+        """Kept for backwards compatibility - not used"""
         llm = get_llm("gpt-4o", 0.7)
         
         subject = drawing.get('subject', drawing.get('title', 'diagram'))

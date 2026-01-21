@@ -223,6 +223,11 @@ export default function StreamingBlackboard({
                     <ChalkDrawing
                       title={boardState.currentDrawing.title}
                       drawingType={boardState.currentDrawing.drawing_type}
+                      isGeneratedImage={boardState.currentDrawing.is_generated_image}
+                      imageBase64={boardState.currentDrawing.image_base64}
+                      mimeType={boardState.currentDrawing.mime_type}
+                      keyParts={boardState.currentDrawing.key_parts}
+                      labelPositions={boardState.currentDrawing.label_positions}
                       steps={boardState.currentDrawing.steps}
                       totalDuration={boardState.currentDrawing.total_duration_ms}
                       explanation={boardState.currentDrawing.explanation}

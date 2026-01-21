@@ -417,13 +417,17 @@ async def run_streaming_lesson(run_id: str, topic: str):
                     try:
                         drawing_task = drawing_item["task"]
                         if drawing_task.done():
-                            drawing_steps = drawing_task.result()
+                            drawing_result = drawing_task.result()
                         else:
-                            drawing_steps = await asyncio.wait_for(drawing_task, timeout=10)
+                            drawing_result = await asyncio.wait_for(drawing_task, timeout=60)
                         
-                        if drawing_steps and drawing_steps.get("steps"):
-                            await streamer.emit_chalk_drawing(drawing_steps)
-                            print(f"✏️ [ChalkDrawing] Emitted: {drawing_steps.get('title', 'Drawing')}")
+                        if drawing_result:
+                            if drawing_result.get("is_generated_image") and drawing_result.get("image_base64"):
+                                await streamer.emit_chalk_drawing(drawing_result)
+                                print(f"✏️ [ChalkDrawing] Emitted Gemini image: {drawing_result.get('title', 'Diagram')}")
+                            elif drawing_result.get("steps"):
+                                await streamer.emit_chalk_drawing(drawing_result)
+                                print(f"✏️ [ChalkDrawing] Emitted SVG: {drawing_result.get('title', 'Drawing')}")
                     except Exception as e:
                         print(f"⚠️ [ChalkDrawing] Error: {e}")
             

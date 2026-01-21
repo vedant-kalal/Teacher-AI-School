@@ -147,8 +147,13 @@ export interface ChalkDrawingStep {
 export interface ChalkDrawingEvent {
   title: string;
   drawing_type: string;
-  total_duration_ms: number;
-  steps: ChalkDrawingStep[];
+  is_generated_image?: boolean;
+  image_base64?: string;
+  mime_type?: string;
+  key_parts?: string[];
+  label_positions?: { label: string; angle: number; index: number }[];
+  total_duration_ms?: number;
+  steps?: ChalkDrawingStep[];
   explanation: string;
 }
 

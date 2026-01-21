@@ -26,11 +26,22 @@ interface DrawingStep {
   paths?: DrawingStep[];
 }
 
+interface LabelPosition {
+  label: string;
+  angle: number;
+  index: number;
+}
+
 interface ChalkDrawingProps {
   title: string;
   drawingType: string;
-  steps: DrawingStep[];
-  totalDuration: number;
+  isGeneratedImage?: boolean;
+  imageBase64?: string;
+  mimeType?: string;
+  keyParts?: string[];
+  labelPositions?: LabelPosition[];
+  steps?: DrawingStep[];
+  totalDuration?: number;
   explanation: string;
   isActive: boolean;
 }
@@ -38,11 +49,18 @@ interface ChalkDrawingProps {
 export default function ChalkDrawing({
   title,
   drawingType,
-  steps,
+  isGeneratedImage,
+  imageBase64,
+  mimeType,
+  keyParts,
+  labelPositions,
+  steps = [],
   totalDuration,
   explanation,
   isActive,
 }: ChalkDrawingProps) {
+  const [showImage, setShowImage] = useState(false);
+  const [showLabels, setShowLabels] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
   const [drawnSteps, setDrawnSteps] = useState<number[]>([]);
   const [animatingSteps, setAnimatingSteps] = useState<Set<number>>(new Set());
@@ -53,45 +71,182 @@ export default function ChalkDrawing({
   void totalDuration;
   
   useEffect(() => {
-    if (!isActive || steps.length === 0) return;
+    if (!isActive) return;
     
-    setCurrentStepIndex(-1);
-    setDrawnSteps([]);
-    setAnimatingSteps(new Set());
-    pathRefs.current.clear();
-    
-    let timeouts: NodeJS.Timeout[] = [];
-    
-    steps.forEach((step, idx) => {
-      const startTimeout = setTimeout(() => {
-        setCurrentStepIndex(idx);
-        setAnimatingSteps(prev => new Set(prev).add(step.step_id));
-        setDrawnSteps(prev => [...prev, step.step_id]);
+    if (isGeneratedImage && imageBase64) {
+      setShowImage(false);
+      setShowLabels(false);
+      
+      const showImageTimer = setTimeout(() => {
+        setShowImage(true);
+      }, 300);
+      
+      const showLabelsTimer = setTimeout(() => {
+        setShowLabels(true);
+      }, 1500);
+      
+      return () => {
+        clearTimeout(showImageTimer);
+        clearTimeout(showLabelsTimer);
+      };
+    } else if (steps && steps.length > 0) {
+      setCurrentStepIndex(-1);
+      setDrawnSteps([]);
+      setAnimatingSteps(new Set());
+      pathRefs.current.clear();
+      
+      let timeouts: NodeJS.Timeout[] = [];
+      
+      steps.forEach((step, idx) => {
+        const startTimeout = setTimeout(() => {
+          setCurrentStepIndex(idx);
+          setAnimatingSteps(prev => new Set(prev).add(step.step_id));
+          setDrawnSteps(prev => [...prev, step.step_id]);
+          
+          const pathEl = pathRefs.current.get(step.step_id);
+          if (pathEl && step.type === 'path') {
+            const length = pathEl.getTotalLength();
+            pathEl.style.strokeDasharray = `${length}`;
+            pathEl.style.strokeDashoffset = `${length}`;
+            pathEl.style.animation = `chalk-path-draw ${step.draw_duration_ms}ms ease-out forwards`;
+          }
+        }, step.delay_ms);
         
-        const pathEl = pathRefs.current.get(step.step_id);
-        if (pathEl && step.type === 'path') {
-          const length = pathEl.getTotalLength();
-          pathEl.style.strokeDasharray = `${length}`;
-          pathEl.style.strokeDashoffset = `${length}`;
-          pathEl.style.animation = `chalk-path-draw ${step.draw_duration_ms}ms ease-out forwards`;
-        }
-      }, step.delay_ms);
+        const endTimeout = setTimeout(() => {
+          setAnimatingSteps(prev => {
+            const next = new Set(prev);
+            next.delete(step.step_id);
+            return next;
+          });
+        }, step.delay_ms + step.draw_duration_ms);
+        
+        timeouts.push(startTimeout, endTimeout);
+      });
       
-      const endTimeout = setTimeout(() => {
-        setAnimatingSteps(prev => {
-          const next = new Set(prev);
-          next.delete(step.step_id);
-          return next;
-        });
-      }, step.delay_ms + step.draw_duration_ms);
-      
-      timeouts.push(startTimeout, endTimeout);
-    });
+      return () => {
+        timeouts.forEach(t => clearTimeout(t));
+      };
+    }
+  }, [isActive, isGeneratedImage, imageBase64, steps]);
+
+  if (isGeneratedImage && imageBase64) {
+    const imgSrc = `data:${mimeType || 'image/png'};base64,${imageBase64}`;
     
-    return () => {
-      timeouts.forEach(t => clearTimeout(t));
-    };
-  }, [isActive, steps]);
+    return (
+      <div className="chalk-drawing-container generated-image">
+        <div className="drawing-title chalk-font">{title}</div>
+        
+        <div className={`chalk-image-wrapper ${showImage ? 'visible' : ''}`}>
+          <img 
+            src={imgSrc} 
+            alt={title}
+            className="chalk-generated-image"
+          />
+          
+          {showLabels && keyParts && keyParts.length > 0 && (
+            <div className="chalk-labels-overlay">
+              {keyParts.slice(0, 6).map((part, idx) => (
+                <div 
+                  key={idx} 
+                  className={`chalk-label-item label-${idx}`}
+                  style={{ animationDelay: `${idx * 200}ms` }}
+                >
+                  <span className="label-arrow">→</span>
+                  <span className="label-text">{part}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {explanation && (
+          <div className="drawing-explanation chalk-font">{explanation}</div>
+        )}
+        
+        <style>{`
+          .chalk-drawing-container.generated-image {
+            background: rgba(20, 40, 30, 0.7);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 16px 0;
+            border: 3px solid rgba(255, 255, 255, 0.25);
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+          }
+          
+          .chalk-image-wrapper {
+            position: relative;
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+            border-radius: 12px;
+            overflow: hidden;
+          }
+          
+          .chalk-image-wrapper.visible {
+            opacity: 1;
+            transform: scale(1);
+          }
+          
+          .chalk-generated-image {
+            width: 100%;
+            height: auto;
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 8px;
+            filter: brightness(1.05) contrast(1.1);
+          }
+          
+          .chalk-labels-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+          }
+          
+          .chalk-label-item {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.75);
+            color: #ffd54f;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-family: 'Patrick Hand', cursive;
+            opacity: 0;
+            animation: label-fade-in 0.5s ease-out forwards;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+          }
+          
+          .label-arrow {
+            color: #ff9999;
+            font-weight: bold;
+          }
+          
+          .label-0 { top: 10%; right: 5%; }
+          .label-1 { top: 25%; left: 5%; }
+          .label-2 { top: 40%; right: 5%; }
+          .label-3 { top: 55%; left: 5%; }
+          .label-4 { top: 70%; right: 5%; }
+          .label-5 { top: 85%; left: 5%; }
+          
+          @keyframes label-fade-in {
+            from {
+              opacity: 0;
+              transform: translateX(-10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(0);
+            }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   const renderStep = (step: DrawingStep, isDrawing: boolean) => {
     const strokeColor = step.stroke || '#ffffff';
@@ -112,21 +267,8 @@ export default function ChalkDrawing({
               strokeLinecap="round"
               strokeLinejoin="round"
               className="chalk-path"
-              style={{
-                filter: 'url(#chalk-glow)',
-              }}
+              style={{ filter: 'url(#chalk-glow)' }}
             />
-            {step.description && step.x !== undefined && step.y !== undefined && (
-              <text
-                x={step.x}
-                y={step.y}
-                fill="rgba(255,255,255,0.6)"
-                fontSize="10"
-                className="step-description"
-              >
-                {step.description}
-              </text>
-            )}
           </g>
         );
       
@@ -302,9 +444,10 @@ export default function ChalkDrawing({
   };
 
   if (!isActive && drawnSteps.length === 0) return null;
+  if (!steps || steps.length === 0) return null;
 
   return (
-    <div className="chalk-drawing-container">
+    <div className="chalk-drawing-container svg-drawing">
       <div className="drawing-title chalk-font">{title}</div>
       <svg
         ref={svgRef}
@@ -331,11 +474,6 @@ export default function ChalkDrawing({
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          
-          <filter id="chalk-texture" x="-5%" y="-5%" width="110%" height="110%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="4" result="noise" />
-            <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.5" />
-          </filter>
         </defs>
         
         {steps.map((step, idx) => {
@@ -349,7 +487,7 @@ export default function ChalkDrawing({
       )}
       
       <style>{`
-        .chalk-drawing-container {
+        .chalk-drawing-container.svg-drawing {
           background: rgba(20, 40, 30, 0.6);
           border-radius: 16px;
           padding: 20px;
@@ -412,18 +550,12 @@ export default function ChalkDrawing({
         }
         
         @keyframes chalk-fade-in {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         
         @keyframes chalk-path-draw {
-          to {
-            stroke-dashoffset: 0;
-          }
+          to { stroke-dashoffset: 0; }
         }
       `}</style>
     </div>

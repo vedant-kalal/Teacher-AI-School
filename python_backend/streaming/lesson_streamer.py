@@ -131,14 +131,27 @@ class LessonStreamer:
         })
     
     async def emit_chalk_drawing(self, drawing: dict):
-        """Emit a chalk drawing event for animated diagram drawing"""
-        await self.emit_event(EventType.CHALK_DRAWING, {
-            "title": drawing.get("title", ""),
-            "drawing_type": drawing.get("drawing_type", "diagram"),
-            "total_duration_ms": drawing.get("total_duration_ms", 8000),
-            "steps": drawing.get("steps", []),
-            "explanation": drawing.get("explanation", "")
-        })
+        """Emit a chalk drawing event - either generated image or SVG steps"""
+        if drawing.get("is_generated_image") and drawing.get("image_base64"):
+            await self.emit_event(EventType.CHALK_DRAWING, {
+                "title": drawing.get("title", ""),
+                "drawing_type": drawing.get("drawing_type", "chalk_image"),
+                "is_generated_image": True,
+                "image_base64": drawing.get("image_base64", ""),
+                "mime_type": drawing.get("mime_type", "image/png"),
+                "key_parts": drawing.get("key_parts", []),
+                "explanation": drawing.get("explanation", ""),
+                "label_positions": drawing.get("label_positions", [])
+            })
+        else:
+            await self.emit_event(EventType.CHALK_DRAWING, {
+                "title": drawing.get("title", ""),
+                "drawing_type": drawing.get("drawing_type", "diagram"),
+                "is_generated_image": False,
+                "total_duration_ms": drawing.get("total_duration_ms", 8000),
+                "steps": drawing.get("steps", []),
+                "explanation": drawing.get("explanation", "")
+            })
     
     async def emit_voice_audio(self, audio_base64: str, text: str, is_hinglish: bool = False):
         """Emit voice audio event with ElevenLabs generated audio"""
