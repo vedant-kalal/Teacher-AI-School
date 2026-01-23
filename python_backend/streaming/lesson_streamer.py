@@ -130,28 +130,30 @@ class LessonStreamer:
             "layout_reason": layout.get("layout_reason", "")
         })
     
-    async def emit_chalk_drawing(self, drawing: dict):
-        """Emit a chalk drawing event - either generated image or SVG steps"""
-        if drawing.get("is_generated_image") and drawing.get("image_base64"):
-            await self.emit_event(EventType.CHALK_DRAWING, {
-                "title": drawing.get("title", ""),
-                "drawing_type": drawing.get("drawing_type", "chalk_image"),
-                "is_generated_image": True,
-                "image_base64": drawing.get("image_base64", ""),
-                "mime_type": drawing.get("mime_type", "image/png"),
-                "key_parts": drawing.get("key_parts", []),
-                "explanation": drawing.get("explanation", ""),
-                "label_positions": drawing.get("label_positions", [])
-            })
-        else:
-            await self.emit_event(EventType.CHALK_DRAWING, {
-                "title": drawing.get("title", ""),
-                "drawing_type": drawing.get("drawing_type", "diagram"),
-                "is_generated_image": False,
-                "total_duration_ms": drawing.get("total_duration_ms", 8000),
-                "steps": drawing.get("steps", []),
-                "explanation": drawing.get("explanation", "")
-            })
+    async def emit_video_ready(
+        self,
+        video_base64: str = None,
+        title: str = "",
+        description: str = "",
+        loop: bool = True,
+        video_type: str = "process_flow",
+        video_url: str = None,
+        mime_type: str = "video/mp4",
+        duration_seconds: int = 8,
+        display_position: str = "right"
+    ):
+        """Emit a video ready event for educational videos"""
+        await self.emit_event(EventType.VIDEO_READY, {
+            "title": title,
+            "description": description,
+            "video_base64": video_base64,
+            "video_url": video_url,
+            "mime_type": mime_type,
+            "duration_seconds": duration_seconds,
+            "loop": loop,
+            "video_type": video_type,
+            "display_position": display_position
+        })
     
     async def emit_voice_audio(self, audio_base64: str, text: str, is_hinglish: bool = False):
         """Emit voice audio event with ElevenLabs generated audio"""

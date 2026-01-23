@@ -20,8 +20,9 @@ from agents.teaching_agents import (
     script_planner, script_analyzer, visual_coordinator, visual_generator,
     narration_agent, board_writer, decider_agent, layout_agent,
     image_source_agent, unique_content_agent, image_analyzer_agent,
-    chalk_drawing_agent, hinglish_agent
+    hinglish_agent
 )
+from agents.video_coordinator_agent import video_coordinator, video_manager
 from streaming.openai_voice_service import generate_hinglish_voice_openai
 
 OPENAI_BASE_URL = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
@@ -176,22 +177,14 @@ async def run_streaming_lesson(run_id: str, topic: str):
         print(f"📊 Visual plan: {len(visual_plan)} visuals planned")
         print(f"📝 Visual strategy: {visual_plan_result.get('visual_summary', 'N/A')}")
         
-        await streamer.emit_status_update("Planning chalk drawings...", 0.12)
+        await streamer.emit_status_update("Planning educational videos...", 0.12)
         
-        chalk_drawings = await chalk_drawing_agent.analyze_for_drawings(segments, topic)
-        chalk_drawing_tasks = {}
-        for drawing in chalk_drawings:
-            segment_idx = drawing.get("segment_index", 1) - 1
-            if segment_idx < 0:
-                segment_idx = 0
-            if segment_idx not in chalk_drawing_tasks:
-                chalk_drawing_tasks[segment_idx] = []
-            task = asyncio.create_task(
-                chalk_drawing_agent.generate_drawing_steps(drawing, topic)
-            )
-            chalk_drawing_tasks[segment_idx].append({"drawing": drawing, "task": task})
+        video_plan = await video_coordinator.analyze_for_videos(segments, topic)
+        video_tasks: Dict[int, asyncio.Task] = {}
         
-        print(f"✏️ [ChalkDrawing] Planned {len(chalk_drawings)} drawings for segments")
+        if video_plan:
+            video_tasks = await video_manager.start_video_generation(video_plan, topic)
+            print(f"🎬 [Video] Started generation of {len(video_plan)} educational videos in parallel")
         
         await streamer.emit_status_update("Pre-generating visual content...", 0.15)
         
@@ -412,25 +405,6 @@ async def run_streaming_lesson(run_id: str, topic: str):
             
             await streamer.emit_board_write(board_event)
             
-            if idx in chalk_drawing_tasks:
-                for drawing_item in chalk_drawing_tasks[idx]:
-                    try:
-                        drawing_task = drawing_item["task"]
-                        if drawing_task.done():
-                            drawing_result = drawing_task.result()
-                        else:
-                            drawing_result = await asyncio.wait_for(drawing_task, timeout=60)
-                        
-                        if drawing_result:
-                            if drawing_result.get("is_generated_image") and drawing_result.get("image_base64"):
-                                await streamer.emit_chalk_drawing(drawing_result)
-                                print(f"✏️ [ChalkDrawing] Emitted Gemini image: {drawing_result.get('title', 'Diagram')}")
-                            elif drawing_result.get("steps"):
-                                await streamer.emit_chalk_drawing(drawing_result)
-                                print(f"✏️ [ChalkDrawing] Emitted SVG: {drawing_result.get('title', 'Drawing')}")
-                    except Exception as e:
-                        print(f"⚠️ [ChalkDrawing] Error: {e}")
-            
             if voice_audio:
                 await streamer.emit_voice_audio(voice_audio, hinglish_narration, is_hinglish=True)
                 print(f"🎤 [Voice] Emitted ElevenLabs audio for segment {idx+1}")
@@ -464,6 +438,25 @@ async def run_streaming_lesson(run_id: str, topic: str):
                     print(f"📸 [Visual] Displayed: {img_title} (Real: {is_real})")
             
             await streamer.emit_narration_segment(narration_segment)
+            
+            if idx in video_tasks:
+                video_task = video_tasks[idx]
+                if video_task.done():
+                    try:
+                        video_result = video_task.result()
+                        if video_result:
+                            await streamer.emit_video_ready(
+                                video_base64=video_result.get("video_base64"),
+                                title=video_result.get("title", "Educational Video"),
+                                description=video_result.get("description", ""),
+                                loop=video_result.get("loop", True),
+                                video_type=video_result.get("video_type", "process_flow")
+                            )
+                            print(f"🎬 [Video] Displayed: {video_result.get('title', 'Video')}")
+                    except Exception as e:
+                        print(f"🎬 [Video] Error retrieving video for segment {idx+1}: {e}")
+                else:
+                    print(f"🎬 [Video] Video for segment {idx+1} not ready yet, skipping (non-blocking)")
             
             lines_added = formatted_board.count('\n') + 1
             current_content_lines += lines_added

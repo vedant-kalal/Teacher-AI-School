@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { BoardState, BoardLine, BoardWriteStyle, cleanTextForBoard, DEFAULT_LAYOUT } from '../types/events';
-import ChalkDrawing from './ChalkDrawing';
+import { BoardState, BoardLine, BoardWriteStyle, cleanTextForBoard, DEFAULT_LAYOUT, VideoReadyEvent } from '../types/events';
 
 interface StreamingBlackboardProps {
   boardState: BoardState;
@@ -219,20 +218,37 @@ export default function StreamingBlackboard({
                     );
                   })}
 
-                  {boardState.currentDrawing && (
-                    <ChalkDrawing
-                      title={boardState.currentDrawing.title}
-                      drawingType={boardState.currentDrawing.drawing_type}
-                      isGeneratedImage={boardState.currentDrawing.is_generated_image}
-                      imageBase64={boardState.currentDrawing.image_base64}
-                      mimeType={boardState.currentDrawing.mime_type}
-                      keyParts={boardState.currentDrawing.key_parts}
-                      labelPositions={boardState.currentDrawing.label_positions}
-                      steps={boardState.currentDrawing.steps}
-                      totalDuration={boardState.currentDrawing.total_duration_ms}
-                      explanation={boardState.currentDrawing.explanation}
-                      isActive={true}
-                    />
+                  {boardState.currentVideo && (
+                    <div className="video-display">
+                      <h3 className="video-title chalk-font">{boardState.currentVideo.title}</h3>
+                      {boardState.currentVideo.video_base64 && (
+                        <video 
+                          className="lesson-video"
+                          autoPlay 
+                          loop={boardState.currentVideo.loop}
+                          muted
+                          playsInline
+                        >
+                          <source 
+                            src={`data:${boardState.currentVideo.mime_type};base64,${boardState.currentVideo.video_base64}`} 
+                            type={boardState.currentVideo.mime_type} 
+                          />
+                        </video>
+                      )}
+                      {boardState.currentVideo.video_url && !boardState.currentVideo.video_base64 && (
+                        <video 
+                          className="lesson-video"
+                          src={boardState.currentVideo.video_url}
+                          autoPlay 
+                          loop={boardState.currentVideo.loop}
+                          muted
+                          playsInline
+                        />
+                      )}
+                      {boardState.currentVideo.description && (
+                        <p className="video-description chalk-font">{boardState.currentVideo.description}</p>
+                      )}
+                    </div>
                   )}
 
                   {lessonStatus === 'completed' && (
@@ -567,6 +583,37 @@ export default function StreamingBlackboard({
         @keyframes fadeIn {
           from { opacity: 0; transform: scale(0.9); }
           to { opacity: 1; transform: scale(1); }
+        }
+
+        .video-display {
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 12px;
+          padding: 16px;
+          margin: 16px 0;
+          border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .video-title {
+          color: #ffd700;
+          text-align: center;
+          margin-bottom: 12px;
+          font-size: 1.3rem;
+        }
+
+        .lesson-video {
+          width: 100%;
+          max-height: 350px;
+          border-radius: 8px;
+          object-fit: contain;
+          background: #000;
+        }
+
+        .video-description {
+          color: rgba(255, 255, 255, 0.85);
+          text-align: center;
+          margin-top: 12px;
+          font-size: 1rem;
+          line-height: 1.4;
         }
       `}</style>
     </div>

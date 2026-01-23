@@ -12,8 +12,8 @@ export enum EventType {
   ERROR = 'error',
   STATUS_UPDATE = 'status_update',
   LAYOUT_UPDATE = 'layout_update',
-  CHALK_DRAWING = 'chalk_drawing',
   VOICE_AUDIO = 'voice_audio',
+  VIDEO_READY = 'video_ready',
 }
 
 export enum MediaType {
@@ -126,35 +126,16 @@ export const DEFAULT_LAYOUT: BoardLayout = {
   title_size: 'large',
 };
 
-export interface ChalkDrawingStep {
-  step_id: number;
-  type: 'rect' | 'circle' | 'ellipse' | 'arrow' | 'line' | 'text' | 'curved_arrow';
-  x: number;
-  y: number;
-  x1?: number;
-  y1?: number;
-  x2?: number;
-  y2?: number;
-  width?: number;
-  height?: number;
-  radius?: number;
-  label?: string;
-  text?: string;
-  delay_ms: number;
-  draw_duration_ms: number;
-}
-
-export interface ChalkDrawingEvent {
+export interface VideoReadyEvent {
   title: string;
-  drawing_type: string;
-  is_generated_image?: boolean;
-  image_base64?: string;
-  mime_type?: string;
-  key_parts?: string[];
-  label_positions?: { label: string; angle: number; index: number }[];
-  total_duration_ms?: number;
-  steps?: ChalkDrawingStep[];
-  explanation: string;
+  description: string;
+  video_base64?: string;
+  video_url?: string;
+  mime_type: string;
+  duration_seconds: number;
+  loop: boolean;
+  display_position: string;
+  video_type?: string;
 }
 
 export interface VoiceAudioEvent {
@@ -170,8 +151,8 @@ export interface BoardState {
   mediaGallery: MediaReadyEvent[];
   isClearing: boolean;
   layout: BoardLayout;
-  currentDrawing: ChalkDrawingEvent | null;
-  drawings: ChalkDrawingEvent[];
+  currentVideo: VideoReadyEvent | null;
+  videos: VideoReadyEvent[];
   currentVoice: VoiceAudioEvent | null;
 }
 

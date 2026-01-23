@@ -12,7 +12,7 @@ import {
   DEFAULT_LAYOUT,
   cleanTextForBoard,
   BoardWriteStyle,
-  ChalkDrawingEvent,
+  VideoReadyEvent,
   VoiceAudioEvent,
 } from '../types/events';
 
@@ -55,8 +55,8 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
     mediaGallery: [],
     isClearing: false,
     layout: DEFAULT_LAYOUT,
-    currentDrawing: null,
-    drawings: [],
+    currentVideo: null,
+    videos: [],
     currentVoice: null,
   });
 
@@ -290,23 +290,21 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
         break;
       }
 
-      case EventType.CHALK_DRAWING: {
-        const drawing: ChalkDrawingEvent = {
-          title: data.title,
-          drawing_type: data.drawing_type,
-          is_generated_image: data.is_generated_image || false,
-          image_base64: data.image_base64 || '',
-          mime_type: data.mime_type || 'image/png',
-          key_parts: data.key_parts || [],
-          label_positions: data.label_positions || [],
-          total_duration_ms: data.total_duration_ms || 8000,
-          steps: data.steps || [],
-          explanation: data.explanation || '',
+      case EventType.VIDEO_READY: {
+        const video: VideoReadyEvent = {
+          title: data.title || '',
+          description: data.description || '',
+          video_base64: data.video_base64,
+          video_url: data.video_url,
+          mime_type: data.mime_type || 'video/mp4',
+          duration_seconds: data.duration_seconds || 8,
+          loop: data.loop !== false,
+          display_position: data.display_position || 'right',
         };
         setBoardState((prev) => ({
           ...prev,
-          currentDrawing: drawing,
-          drawings: [...prev.drawings, drawing],
+          currentVideo: video,
+          videos: [...prev.videos, video],
         }));
         break;
       }
@@ -360,8 +358,8 @@ export function useLessonStream(options: UseLessonStreamOptions = {}): UseLesson
       mediaGallery: [],
       isClearing: false,
       layout: DEFAULT_LAYOUT,
-      currentDrawing: null,
-      drawings: [],
+      currentVideo: null,
+      videos: [],
       currentVoice: null,
     });
 

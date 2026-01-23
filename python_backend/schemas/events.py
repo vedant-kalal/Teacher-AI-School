@@ -22,8 +22,8 @@ class EventType(str, Enum):
     ERROR = "error"
     STATUS_UPDATE = "status_update"
     LAYOUT_UPDATE = "layout_update"
-    CHALK_DRAWING = "chalk_drawing"
     VOICE_AUDIO = "voice_audio"
+    VIDEO_READY = "video_ready"
 
 
 class BoardLayoutConfig(BaseModel):
@@ -101,30 +101,16 @@ class MediaReadyEvent(BaseModel):
     display_duration_ms: int = 5000
 
 
-class ChalkDrawingStep(BaseModel):
-    step_id: int
-    type: str
-    x: float = 0
-    y: float = 0
-    x1: Optional[float] = None
-    y1: Optional[float] = None
-    x2: Optional[float] = None
-    y2: Optional[float] = None
-    width: Optional[float] = None
-    height: Optional[float] = None
-    radius: Optional[float] = None
-    label: Optional[str] = None
-    text: Optional[str] = None
-    delay_ms: int = 0
-    draw_duration_ms: int = 500
-
-
-class ChalkDrawingEvent(BaseModel):
+class VideoReadyEvent(BaseModel):
+    """Event for educational video ready to display"""
     title: str
-    drawing_type: str
-    total_duration_ms: int = 8000
-    steps: List[ChalkDrawingStep]
-    explanation: str = ""
+    description: str = ""
+    video_base64: Optional[str] = None
+    video_url: Optional[str] = None
+    mime_type: str = "video/mp4"
+    duration_seconds: int = 8
+    loop: bool = True
+    display_position: str = "right"
 
 
 class VoiceAudioEvent(BaseModel):
